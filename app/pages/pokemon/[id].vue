@@ -88,6 +88,11 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
           >
             #{{ dexNumber(id) }}
           </span>
+          <ColorToggle
+            :id="id"
+            :name="pokemon.name"
+            class="absolute top-3.5 right-4 z-10"
+          />
           <DitherSprite
             :id="id"
             :size="256"

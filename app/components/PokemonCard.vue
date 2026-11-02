@@ -29,6 +29,9 @@ const label = computed(() => pokemonLabel(props.pokemon.name))
         {{ label }}
       </h3>
     </NuxtLink>
-    <WishlistToggle :pokemon="props.pokemon" class="absolute top-2 right-2" />
+    <div class="absolute top-2 right-2 flex gap-1.5">
+      <ColorToggle :id="id" :name="props.pokemon.name" compact />
+      <WishlistToggle :pokemon="props.pokemon" />
+    </div>
   </article>
 </template>

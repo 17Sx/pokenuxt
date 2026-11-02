@@ -4,9 +4,21 @@ const props = withDefaults(
   { size: 128, alt: '' },
 )
 
+const { isColored } = useSpriteColor()
+const src = computed(
+  () =>
+    `/api/sprite/${props.id}?s=${props.size}${isColored(props.id) ? '&c=1' : ''}`,
+)
+
 const image = useTemplateRef('image')
 const loaded = ref(false)
 const failed = ref(false)
+
+// Switching colour loads another picture: draw it in again.
+watch(src, () => {
+  loaded.value = false
+  failed.value = false
+})
 
 // The image may finish loading before hydration, when no listener is attached yet.
 onMounted(() => {
@@ -21,7 +33,7 @@ onMounted(() => {
     <img
       v-if="!failed"
       ref="image"
-      :src="`/api/sprite/${props.id}?s=${props.size}`"
+      :src="src"
       :alt="props.alt"
       :width="props.size"
       :height="props.size"
