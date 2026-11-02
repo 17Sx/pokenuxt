@@ -1,6 +1,58 @@
 import type { NamedAPIResource } from 'pokenode-ts'
 
-const STORAGE_KEY = 'pokenuxt-wishlist'
+export const STORAGE_KEY = 'pokenuxt-wishlist'
+
+type WishlistStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+
+function isResource(value: unknown): value is NamedAPIResource {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as NamedAPIResource).name === 'string' &&
+    typeof (value as NamedAPIResource).url === 'string'
+  )
+}
+
+/**
+ * Reads the saved wishlist. Never throws: an empty, unreadable or corrupted
+ * entry gives an empty list, and a corrupted entry is removed. In a list,
+ * entries that aren't Pokémon are dropped and the others kept.
+ */
+export function readWishlist(storage: WishlistStorage): NamedAPIResource[] {
+  let stored: string | null
+  try {
+    stored = storage.getItem(STORAGE_KEY)
+  } catch {
+    // Storage can be blocked, in some private windows for example.
+    return []
+  }
+  if (!stored) return []
+
+  try {
+    const parsed: unknown = JSON.parse(stored)
+    if (Array.isArray(parsed)) return parsed.filter(isResource)
+  } catch {
+    // Not JSON: removed below.
+  }
+  try {
+    storage.removeItem(STORAGE_KEY)
+  } catch {
+    // Nothing more to do.
+  }
+  return []
+}
+
+/** Saves the wishlist. Never throws, even when the storage is full or blocked. */
+export function saveWishlist(
+  storage: WishlistStorage,
+  list: NamedAPIResource[],
+): void {
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(list))
+  } catch {
+    // The wishlist still works for this visit.
+  }
+}
 
 export function addPokemon(
   list: NamedAPIResource[],
@@ -21,22 +73,11 @@ export function useWishlist() {
     ready.value = true
 
     onNuxtReady(() => {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        try {
-          wishlist.value = JSON.parse(stored) as NamedAPIResource[]
-        } catch {
-          localStorage.removeItem(STORAGE_KEY)
-        }
-      }
+      wishlist.value = readWishlist(localStorage)
 
-      watch(
-        wishlist,
-        (value) => {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-        },
-        { deep: true },
-      )
+      watch(wishlist, (value) => saveWishlist(localStorage, value), {
+        deep: true,
+      })
     })
   }
 

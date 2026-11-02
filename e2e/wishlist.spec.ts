@@ -74,6 +74,43 @@ test('garde la wishlist après un rechargement', async ({ page, goto }) => {
   ).toBeVisible()
 })
 
+for (const [label, value] of [
+  ['du JSON invalide', '[{"name":"pikachu",'],
+  ['du JSON qui n’est pas une liste', '{"name":"pikachu"}'],
+]) {
+  test(`ne plante pas avec ${label} dans le stockage`, async ({
+    page,
+    goto,
+  }) => {
+    await page.addInitScript(
+      (stored) => localStorage.setItem('pokenuxt-wishlist', stored),
+      value,
+    )
+    await goto('/', { waitUntil: 'hydration' })
+
+    const wishlist = page.locator('#wishlist')
+    await expect(
+      wishlist.getByText('Aucun Pokémon pour l’instant.'),
+    ).toBeVisible()
+
+    // The wishlist still works, and what it saves is valid again.
+    await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
+    await page
+      .locator('#pokedex')
+      .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' })
+      .click()
+    await expect(
+      wishlist.getByRole('link', { name: 'Bulbasaur' }),
+    ).toBeVisible()
+    const saved = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('pokenuxt-wishlist')!),
+    )
+    expect(saved).toEqual([
+      { name: 'bulbasaur', url: 'https://pokeapi.co/api/v2/pokemon/1/' },
+    ])
+  })
+}
+
 test('ouvre la fiche d’un Pokémon et l’ajoute depuis la fiche', async ({
   page,
 }) => {
