@@ -14,25 +14,30 @@ export function useWishlist() {
   const wishlist = useState<NamedAPIResource[]>('wishlist', () => [])
   const ready = useState('wishlist-ready', () => false)
 
+  // Read localStorage once the page is hydrated, so the first client render
+  // matches the server one. The watcher then lives outside any component and
+  // keeps saving when you change pages.
   if (import.meta.client && !ready.value) {
     ready.value = true
 
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        wishlist.value = JSON.parse(stored) as NamedAPIResource[]
-      } catch {
-        localStorage.removeItem(STORAGE_KEY)
+    onNuxtReady(() => {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        try {
+          wishlist.value = JSON.parse(stored) as NamedAPIResource[]
+        } catch {
+          localStorage.removeItem(STORAGE_KEY)
+        }
       }
-    }
 
-    watch(
-      wishlist,
-      (value) => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-      },
-      { deep: true },
-    )
+      watch(
+        wishlist,
+        (value) => {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+        },
+        { deep: true },
+      )
+    })
   }
 
   const removePokemon = (pokemon: NamedAPIResource) => {

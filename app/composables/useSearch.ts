@@ -1,5 +1,5 @@
 export function useSearch() {
-  const search = ref('')
+  const search = useState('search', () => '')
 
   return { search }
 }

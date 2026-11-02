@@ -1,64 +1,119 @@
-import type { Page } from '@playwright/test'
 import { expect, test } from '@nuxt/test-utils/playwright'
-
-const wishlistSection = (page: Page) =>
-  page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: /^Wishlist/ }) })
 
 test.beforeEach(async ({ goto }) => {
   await goto('/', { waitUntil: 'hydration' })
 })
 
 test('filtre la liste avec la recherche', async ({ page }) => {
+  const pokedex = page.locator('#pokedex')
+
   await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
 
   await expect(
-    page.getByRole('link', { name: 'bulbasaur', exact: true }),
+    pokedex.getByRole('heading', { name: 'Bulbasaur', exact: true }),
   ).toBeVisible()
   await expect(
-    page.getByRole('link', { name: 'pikachu', exact: true }),
+    pokedex.getByRole('heading', { name: 'Pikachu', exact: true }),
   ).toHaveCount(0)
 })
 
+test('trouve un Pokémon par son numéro', async ({ page }) => {
+  await page.getByPlaceholder('Rechercher un Pokémon').fill('#25')
+
+  await expect(
+    page
+      .locator('#pokedex')
+      .getByRole('heading', { name: 'Pikachu', exact: true }),
+  ).toBeVisible()
+})
+
 test('ajoute puis retire un Pokémon de la wishlist', async ({ page }) => {
-  const wishlist = wishlistSection(page)
+  const wishlist = page.locator('#wishlist')
+  const pokedex = page.locator('#pokedex')
   await expect(
     wishlist.getByText('Aucun Pokémon pour l’instant.'),
   ).toBeVisible()
 
   await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
-  await page.getByRole('button', { name: 'Add +' }).click()
+  await pokedex
+    .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' })
+    .click()
 
+  await expect(wishlist.getByRole('link', { name: 'Bulbasaur' })).toBeVisible()
+  // Once added, the card's button only removes it, so it can't be added twice.
   await expect(
-    page.getByRole('heading', { name: 'Wishlist (1)' }),
-  ).toBeVisible()
-  await expect(
-    wishlist.getByRole('link', { name: 'bulbasaur', exact: true }),
-  ).toBeVisible()
-  // Once added, the Pokémon can only be removed, so it can't be added twice.
-  await expect(page.getByRole('button', { name: 'Add +' })).toHaveCount(0)
+    pokedex.getByRole('button', { name: 'Retirer Bulbasaur de la wishlist' }),
+  ).toHaveAttribute('aria-pressed', 'true')
 
-  await page.getByRole('button', { name: 'Remove -' }).click()
+  await wishlist
+    .getByRole('button', { name: 'Retirer Bulbasaur de la wishlist' })
+    .click()
 
-  await expect(
-    page.getByRole('heading', { name: 'Wishlist (0)' }),
-  ).toBeVisible()
   await expect(
     wishlist.getByText('Aucun Pokémon pour l’instant.'),
   ).toBeVisible()
+  await expect(
+    pokedex.getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' }),
+  ).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('garde la wishlist après un rechargement', async ({ page, goto }) => {
   await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
-  await page.getByRole('button', { name: 'Add +' }).click()
+  await page
+    .locator('#pokedex')
+    .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' })
+    .click()
   await expect(
-    page.getByRole('heading', { name: 'Wishlist (1)' }),
+    page.locator('#wishlist').getByRole('link', { name: 'Bulbasaur' }),
   ).toBeVisible()
 
   await goto('/', { waitUntil: 'hydration' })
 
   await expect(
-    wishlistSection(page).getByRole('link', { name: 'bulbasaur', exact: true }),
+    page.locator('#wishlist').getByRole('link', { name: 'Bulbasaur' }),
   ).toBeVisible()
+})
+
+test('ouvre la fiche d’un Pokémon et l’ajoute depuis la fiche', async ({
+  page,
+}) => {
+  await page.getByPlaceholder('Rechercher un Pokémon').fill('pikachu')
+  await page
+    .locator('#pokedex')
+    .getByRole('link', { name: 'Pikachu', exact: false })
+    .first()
+    .click()
+
+  await expect(page).toHaveURL(/\/pokemon\/25$/)
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Pikachu' }),
+  ).toBeVisible()
+  await expect(page.getByText('Électrik')).toBeVisible()
+
+  await page
+    .getByRole('button', { name: 'Ajouter Pikachu à la wishlist' })
+    .click()
+  await page.getByRole('link', { name: 'Pokédex', exact: true }).first().click()
+
+  await expect(
+    page.locator('#wishlist').getByRole('link', { name: 'Pikachu' }),
+  ).toBeVisible()
+})
+
+test('affiche une 404 pour un Pokémon inconnu', async ({ page, goto }) => {
+  await goto('/pokemon/99999', { waitUntil: 'hydration' })
+
+  await expect(page.getByText('404')).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Retour au Pokédex' }),
+  ).toBeVisible()
+})
+
+test('sert les sprites en PNG dithéré', async ({ request }) => {
+  const sprite = await request.get('/api/sprite/25?s=128')
+  expect(sprite.status()).toBe(200)
+  expect(sprite.headers()['content-type']).toBe('image/png')
+
+  const invalid = await request.get('/api/sprite/25?s=500')
+  expect(invalid.status()).toBe(400)
 })
