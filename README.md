@@ -18,6 +18,7 @@ npm run dev
 | `npm run build` | Production build |
 | `npm run typecheck` | Type check |
 | `npm run lint` | ESLint (`lint:fix` to autofix) |
+| `npm run format` | Prettier (`format:check` in CI) |
 | `npm run db:generate` | Generate SQL migrations from `server/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:push` | Push the schema directly (prototyping) |

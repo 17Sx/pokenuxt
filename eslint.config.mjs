@@ -1,6 +1,6 @@
 // @ts-check
+import prettier from 'eslint-config-prettier/flat'
 import withNuxt from './.nuxt/eslint.config.mjs'
 
-export default withNuxt(
-  // Your custom configs here
-)
+// Prettier owns formatting, ESLint only reports code issues
+export default withNuxt(prettier)
