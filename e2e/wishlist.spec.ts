@@ -27,6 +27,15 @@ test('trouve un Pokémon par son numéro', async ({ page }) => {
   ).toBeVisible()
 })
 
+test('⌘K ou Ctrl+K place le curseur dans la recherche', async ({ page }) => {
+  const search = page.getByPlaceholder('Rechercher un Pokémon')
+  await expect(search).not.toBeFocused()
+
+  await page.keyboard.press('ControlOrMeta+k')
+
+  await expect(search).toBeFocused()
+})
+
 test('ajoute puis retire un Pokémon de la wishlist', async ({ page }) => {
   const wishlist = page.locator('#wishlist')
   const pokedex = page.locator('#pokedex')

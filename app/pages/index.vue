@@ -27,29 +27,38 @@ const results = computed(() => {
 
 const input = useTemplateRef('input')
 
-// "/" jumps to the search field from anywhere on the page.
+// ⌘K, or Ctrl+K outside macOS, jumps to the search field, as on 17sx.me.
+const mac = ref(true)
+
 function onKeydown(event: KeyboardEvent) {
-  const target = event.target as HTMLElement
-  if (event.key !== '/' || target.closest('input, textarea')) return
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') {
+    return
+  }
   event.preventDefault()
   input.value?.focus()
+  input.value?.select()
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  mac.value = /Mac|iPhone|iPad/.test(navigator.platform)
+  window.addEventListener('keydown', onKeydown)
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <div>
-    <section class="pt-14 pb-12 sm:pt-20">
-      <p
-        class="font-mono text-[11px] tracking-[0.22em] text-zinc-500 uppercase"
-      >
-        Pokédex national
-      </p>
+    <section class="relative isolate pt-14 pb-12 sm:pt-20">
+      <img
+        src="/banner.png"
+        alt=""
+        width="512"
+        height="170"
+        class="pixelated pointer-events-none absolute top-0 -left-4 -z-10 w-[calc(100%+2rem)] max-w-none opacity-30 [mask-image:linear-gradient(to_bottom,black_30%,transparent_95%)] md:-left-8 md:w-[calc(100%+4rem)]"
+      />
       <h1
         class="mt-4 max-w-xl text-[40px] leading-[1.02] font-bold tracking-tight text-zinc-50 sm:text-[56px]"
       >
-        Tous les Pokémon, point par point.
+        Tous les Pokémon.
       </h1>
       <p class="mt-5 max-w-md text-[15px] leading-relaxed text-zinc-400">
         {{ data?.results.length ?? 0 }} Pokémon tirés de PokéAPI. Cherche-les,
@@ -81,9 +90,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           class="h-full min-w-0 flex-1 bg-transparent text-[15px] text-zinc-50 outline-none placeholder:text-zinc-600 [&::-webkit-search-cancel-button]:hidden"
         />
         <kbd
-          class="hidden rounded border border-white/10 bg-white/5 px-1.5 py-px font-mono text-[11px] text-zinc-500 sm:block"
+          class="hidden items-center gap-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 font-sans text-[11px] text-zinc-500 sm:inline-flex"
         >
-          /
+          <span class="px-0.5">{{ mac ? '⌘' : 'Ctrl' }}</span>
+          <span class="rounded bg-white/10 px-1 py-px">K</span>
         </kbd>
       </label>
     </section>

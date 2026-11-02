@@ -1,20 +1,39 @@
 import { PNG } from 'pngjs'
 
-// A pixel is part of the Pokémon when at least half of it is opaque.
+// A pixel is part of the picture when at least half of it is opaque.
 const COVERAGE = 0.5
-// Lightness is squeezed between FLOOR and CEILING. The darkest parts of a
-// Pokémon keep a few dots, so its shape still reads on a black background,
-// and white parts keep a few gaps, so light Pokémon don't turn solid.
-const FLOOR = 0.12
-const CEILING = 0.92
-const GAMMA = 0.9
-// How much edges are boosted before dithering, so outlines and eyes stay
-// visible inside light areas.
-const SHARPEN = 0.9
 // Empty space kept around the Pokémon, as a share of its largest side.
 const MARGIN = 0.06
 
 type Bounds = { x: number; y: number; width: number; height: number }
+
+type Tone = {
+  // Lightness is squeezed between floor and ceiling. For sprites, the darkest
+  // parts keep a few dots, so the shape still reads on a black background,
+  // and white parts keep a few gaps, so light Pokémon don't turn solid.
+  floor: number
+  ceiling: number
+  gamma: number
+  // How much edges are boosted before dithering, so outlines and eyes stay
+  // visible inside light areas.
+  sharpen: number
+  // Dark becomes dots and light becomes black: outlines turn into white lines.
+  invert?: boolean
+}
+
+const SPRITE_TONE: Tone = {
+  floor: 0.12,
+  ceiling: 0.92,
+  gamma: 0.9,
+  sharpen: 0.9,
+}
+const BANNER_TONE: Tone = {
+  floor: 0,
+  ceiling: 1,
+  gamma: 2.6,
+  sharpen: 1.4,
+  invert: true,
+}
 
 function opaqueBounds({ width, height, data }: PNG): Bounds {
   let minX = width
@@ -35,23 +54,26 @@ function opaqueBounds({ width, height, data }: PNG): Bounds {
   return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
 }
 
-// Crops the sprite to the Pokémon, scales it down to size × size by averaging
-// each block of pixels, and returns a lightness from 0 to 1 per pixel, or -1
-// where the pixel is transparent.
-function lightness(source: PNG, size: number) {
-  const bounds = opaqueBounds(source)
-  const side = Math.max(bounds.width, bounds.height) * (1 + MARGIN * 2)
-  const left = bounds.x + bounds.width / 2 - side / 2
-  const top = bounds.y + bounds.height / 2 - side / 2
-  const step = side / size
-  const values = new Float32Array(size * size).fill(-1)
+// Scales the bounds of the source down to width × height by averaging each
+// block of pixels, and returns a lightness from 0 to 1 per pixel, or -1 where
+// the pixel is transparent.
+function lightness(
+  source: PNG,
+  bounds: Bounds,
+  width: number,
+  height: number,
+  tone: Tone,
+) {
+  const stepX = bounds.width / width
+  const stepY = bounds.height / height
+  const values = new Float32Array(width * height).fill(-1)
 
-  for (let y = 0; y < size; y++) {
-    const y0 = Math.floor(top + y * step)
-    const y1 = Math.max(y0 + 1, Math.floor(top + (y + 1) * step))
-    for (let x = 0; x < size; x++) {
-      const x0 = Math.floor(left + x * step)
-      const x1 = Math.max(x0 + 1, Math.floor(left + (x + 1) * step))
+  for (let y = 0; y < height; y++) {
+    const y0 = Math.floor(bounds.y + y * stepY)
+    const y1 = Math.max(y0 + 1, Math.floor(bounds.y + (y + 1) * stepY))
+    for (let x = 0; x < width; x++) {
+      const x0 = Math.floor(bounds.x + x * stepX)
+      const x1 = Math.max(x0 + 1, Math.floor(bounds.x + (x + 1) * stepX))
       let alpha = 0
       let light = 0
       for (let sy = y0; sy < y1; sy++) {
@@ -71,30 +93,34 @@ function lightness(source: PNG, size: number) {
       }
       const count = (y1 - y0) * (x1 - x0)
       if (alpha / count < COVERAGE) continue
-      values[y * size + x] =
-        FLOOR + (CEILING - FLOOR) * (light / alpha) ** GAMMA
+      const l = tone.invert ? 1 - light / alpha : light / alpha
+      values[y * width + x] =
+        tone.floor + (tone.ceiling - tone.floor) * l ** tone.gamma
     }
   }
-  return sharpen(values, size)
+  return sharpen(values, width, tone.sharpen)
 }
 
 // Pushes each pixel away from the average of its four neighbours.
-function sharpen(values: Float32Array, size: number) {
+function sharpen(values: Float32Array, width: number, amount: number) {
   const output = values.slice()
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = y * size + x
-      if (values[i]! < 0) continue
-      let sum = 0
-      let count = 0
-      for (const j of [i - 1, i + 1, i - size, i + size]) {
-        const value = values[j]
-        if (value === undefined || value < 0) continue
-        sum += value
-        count++
-      }
-      if (count) output[i] = values[i]! + SHARPEN * (values[i]! - sum / count)
+  for (let i = 0; i < values.length; i++) {
+    if (values[i]! < 0) continue
+    const x = i % width
+    let sum = 0
+    let count = 0
+    for (const j of [
+      x > 0 ? i - 1 : -1,
+      x < width - 1 ? i + 1 : -1,
+      i - width,
+      i + width,
+    ]) {
+      const value = values[j]
+      if (value === undefined || value < 0) continue
+      sum += value
+      count++
     }
+    if (count) output[i] = values[i]! + amount * (values[i]! - sum / count)
   }
   return output
 }
@@ -111,15 +137,13 @@ const ATKINSON = [
   [0, 2],
 ] as const
 
-/** Turns a sprite PNG into a size × size PNG of white dots on transparent. */
-export function ditherSprite(input: Buffer, size: number): Buffer {
-  const values = lightness(PNG.sync.read(input), size)
-  const output = new PNG({ width: size, height: size })
+function atkinson(values: Float32Array, width: number, height: number) {
+  const output = new PNG({ width, height })
   output.data.fill(0)
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = y * size + x
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x
       const value = values[i]!
       if (value < 0) continue
       const on = value >= 0.5
@@ -127,12 +151,46 @@ export function ditherSprite(input: Buffer, size: number): Buffer {
       for (const [dx, dy] of ATKINSON) {
         const nx = x + dx
         const ny = y + dy
-        if (nx < 0 || nx >= size || ny >= size) continue
-        const j = ny * size + nx
+        if (nx < 0 || nx >= width || ny >= height) continue
+        const j = ny * width + nx
         if (values[j]! >= 0) values[j]! += error
       }
       if (on) output.data.fill(255, i * 4, i * 4 + 4)
     }
   }
   return PNG.sync.write(output)
+}
+
+/** Turns a sprite PNG into a size × size PNG of white dots on transparent. */
+export function ditherSprite(input: Buffer, size: number): Buffer {
+  const source = PNG.sync.read(input)
+  const bounds = opaqueBounds(source)
+  // A square around the Pokémon, centred, with some margin.
+  const side = Math.max(bounds.width, bounds.height) * (1 + MARGIN * 2)
+  const square = {
+    x: bounds.x + bounds.width / 2 - side / 2,
+    y: bounds.y + bounds.height / 2 - side / 2,
+    width: side,
+    height: side,
+  }
+  return atkinson(
+    lightness(source, square, size, size, SPRITE_TONE),
+    size,
+    size,
+  )
+}
+
+/**
+ * Turns a whole picture into white dots on transparent, `width` dots wide.
+ * Inverted, so a bright illustration stays quiet behind text.
+ */
+export function ditherBanner(input: Buffer, width: number): Buffer {
+  const source = PNG.sync.read(input)
+  const height = Math.round((width * source.height) / source.width)
+  const whole = { x: 0, y: 0, width: source.width, height: source.height }
+  return atkinson(
+    lightness(source, whole, width, height, BANNER_TONE),
+    width,
+    height,
+  )
 }

@@ -6,7 +6,6 @@ const { wishlist } = useWishlist()
   <div
     class="relative min-h-screen overflow-x-hidden bg-black text-zinc-100 antialiased"
   >
-    <!-- Dotted rules on both sides of the column, as on 17sx.me. -->
     <div
       aria-hidden="true"
       class="pointer-events-none absolute inset-0 mx-auto hidden max-w-5xl md:block"
@@ -69,25 +68,5 @@ const { wishlist } = useWishlist()
     <main class="relative mx-auto max-w-5xl px-4 md:px-8">
       <slot />
     </main>
-
-    <footer class="relative mx-auto max-w-5xl px-4 md:px-8">
-      <DotSection>
-        <div
-          class="flex flex-wrap items-center justify-between gap-3 font-mono text-[11px] tracking-[0.18em] text-zinc-500 uppercase"
-        >
-          <p>
-            Données
-            <a
-              href="https://pokeapi.co"
-              target="_blank"
-              rel="noreferrer"
-              class="text-zinc-300 transition-colors hover:text-white"
-              >PokéAPI</a
-            >
-          </p>
-          <p>Nuxt 4 · Tailwind · Atkinson dithering</p>
-        </div>
-      </DotSection>
-    </footer>
   </div>
 </template>
