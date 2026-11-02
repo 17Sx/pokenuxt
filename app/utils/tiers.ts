@@ -13,6 +13,8 @@ export interface OpenedCard {
   name: string
   image: string | null
   tier: Tier
+  // Printed with a foil background, as in the reverse holo slot of real packs
+  reverse: boolean
   isNew: boolean
 }
 
@@ -60,6 +62,12 @@ export const HOLO_PRESETS: Partial<Record<Tier, HoloPreset>> = {
   ultra: 'stars',
   secret: 'gold',
 }
+
+// Reverse holos get a softer foil than the rare cards
+export const REVERSE_PRESET: HoloPreset = 'shards'
+
+export const cardLabel = (card: { tier: Tier; reverse?: boolean }) =>
+  card.reverse ? `${TIER_LABELS[card.tier]} · Reverse` : TIER_LABELS[card.tier]
 
 export const isHolo = (tier?: Tier | null) =>
   Boolean(tier && HOLO_PRESETS[tier])

@@ -77,6 +77,7 @@ async function onOpened() {
       name: card.name,
       image: card.image,
       tier: card.tier,
+      reverse: card.reverse,
       isNew: !owned.value[card.id],
     }))
     add(pack)
@@ -210,7 +211,7 @@ const selectClass =
             >
           </p>
           <p class="text-xs" :class="TIER_COLORS[card.tier]">
-            {{ TIER_LABELS[card.tier] }}
+            {{ cardLabel(card) }}
           </p>
         </li>
       </ul>

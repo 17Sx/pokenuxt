@@ -126,13 +126,13 @@ export const router = {
           })
         }
         return Promise.all(
-          pack.map(async ({ card, tier }) => {
+          pack.map(async ({ card, tier, reverse }) => {
             const resume = await toCardResume(card, 'high')
             if (tier === 'energy' && !resume.image) {
               const setId = card.id.slice(0, card.id.lastIndexOf('-'))
               resume.image = await energyImageFor(setId, card.localId)
             }
-            return { ...resume, tier }
+            return { ...resume, tier, reverse }
           }),
         )
       }),

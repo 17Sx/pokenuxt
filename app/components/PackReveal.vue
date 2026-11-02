@@ -137,10 +137,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         @pointercancel="onPointerUp"
       >
         <HoloCard
-          v-if="current.image && isHolo(current.tier)"
+          v-if="current.image && (isHolo(current.tier) || current.reverse)"
           :image="highQuality(current.image)"
           :alt="current.name"
-          :preset="HOLO_PRESETS[current.tier]"
+          :preset="
+            isHolo(current.tier) ? HOLO_PRESETS[current.tier] : REVERSE_PRESET
+          "
+          :intensity="isHolo(current.tier) ? 0.85 : 0.5"
           :width="320"
           :radius="12"
           :hover-scale="1"
@@ -172,7 +175,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         >
       </p>
       <p class="text-sm font-medium" :class="TIER_COLORS[current.tier]">
-        {{ TIER_LABELS[current.tier] }}
+        {{ cardLabel(current) }}
       </p>
     </div>
 
