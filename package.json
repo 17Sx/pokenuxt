@@ -12,7 +12,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -28,9 +30,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@nuxt/eslint": "^1.17.0",
     "@types/node": "^26.6.6",
     "dotenv": "^18.0.9",
     "drizzle-kit": "^0.31.11",
+    "eslint": "^10.14.0",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.14"
   }

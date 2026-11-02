@@ -23,6 +23,8 @@ const props = withDefaults(defineProps<{
   idle?: boolean
   shadow?: boolean
 }>(), {
+  image: undefined,
+  backImage: undefined,
   alt: '',
   preset: 'bursts',
   intensity: 0.85,
