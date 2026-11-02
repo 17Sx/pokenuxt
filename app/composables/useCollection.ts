@@ -9,17 +9,6 @@ export interface OwnedCard {
   firstAt: number
 }
 
-export const TIER_LABELS: Record<Tier, string> = {
-  common: 'Commune',
-  uncommon: 'Peu commune',
-  rare: 'Rare',
-  holo: 'Holo',
-  ultra: 'Ultra rare',
-  secret: 'Secrète'
-}
-
-export const TIER_ORDER: Tier[] = ['secret', 'ultra', 'holo', 'rare', 'uncommon', 'common']
-
 // Filled from localStorage by plugins/collection.client.ts once the app is hydrated
 export function useCollection() {
   const cards = useState<Record<string, OwnedCard>>('collection', () => ({}))

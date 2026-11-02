@@ -23,6 +23,9 @@ const TIERS: Record<Tier, string[]> = {
   secret: ['Hyper rare', 'Illustration spéciale rare', 'Méga Hyper Rare', 'Trois Étoiles', 'Couronne']
 }
 
+export const tierOf = (rarity?: string) =>
+  (Object.keys(TIERS) as Tier[]).find(tier => rarity && TIERS[tier].includes(rarity)) ?? null
+
 // Odds for the rare slot, renormalised over the tiers the set actually has
 const RARE_SLOT_WEIGHTS: Partial<Record<Tier, number>> = { rare: 65, holo: 22, ultra: 10, secret: 3 }
 

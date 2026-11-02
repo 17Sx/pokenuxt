@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { CardSummary } from '~/utils/tiers'
+
 const { $orpc } = useNuxtApp()
 const { cards: owned } = useCollection()
 const query = ref('Pikachu')
@@ -31,6 +33,8 @@ const { data: cards, status, error } = await useAsyncData(
     : Promise.resolve([]),
   { watch: [search, filters] }
 )
+
+const selected = ref<CardSummary | null>(null)
 
 const resetFilters = () => Object.assign(filters, { type: '', rarity: '', category: '' })
 const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500'
@@ -89,9 +93,12 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
         >
           ×{{ owned[card.id]!.count }}
         </span>
-        <CardImage :src="card.image" :alt="card.name" />
+        <button type="button" class="block w-full cursor-pointer transition-transform hover:-translate-y-1" @click="selected = card">
+          <CardImage :src="card.image" :alt="card.name" />
+        </button>
         <p class="mt-2 truncate text-sm text-zinc-400">{{ card.name }} · {{ card.id }}</p>
       </li>
     </ul>
+    <CardDetail :card="selected" @close="selected = null" />
   </div>
 </template>

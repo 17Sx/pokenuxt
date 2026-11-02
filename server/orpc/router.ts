@@ -2,7 +2,7 @@ import { ORPCError, os } from '@orpc/server'
 import { Query } from '@tcgdex/sdk'
 import type { CardModel, CardResumeModel, Quality } from '@tcgdex/sdk'
 import * as z from 'zod'
-import { openPack } from '../utils/packs'
+import { openPack, tierOf } from '../utils/packs'
 import { tcgdex, tcgdexEn } from '../utils/tcgdex'
 
 export interface Context {
@@ -29,6 +29,7 @@ const toCard = async (card: CardModel) => ({
   ...(await toCardResume(card, 'high')),
   category: card.category,
   rarity: card.rarity,
+  tier: tierOf(card.rarity),
   illustrator: card.illustrator ?? null,
   hp: card.hp ?? null,
   types: card.types ?? [],

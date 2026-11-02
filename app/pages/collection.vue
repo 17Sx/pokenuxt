@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Tier } from '~~/server/utils/packs'
-
+import type { CardSummary } from '~/utils/tiers'
 const { cards, unique, total } = useCollection()
 const name = ref('')
 const tier = ref<Tier | ''>('')
@@ -13,8 +13,7 @@ const visible = computed(() => {
     .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier) || a.name.localeCompare(b.name, 'fr'))
 })
 
-// Pack cards are stored with the high quality image used by HoloCard
-const thumbnail = (image: string) => image.replace('/high.', '/low.')
+const selected = ref<CardSummary | null>(null)
 
 const clear = () => {
   if (confirm('Vider toute la collection ?')) cards.value = {}
@@ -65,11 +64,14 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
           >
             ×{{ card.count }}
           </span>
-          <CardImage :src="card.image && thumbnail(card.image)" :alt="card.name" />
+          <button type="button" class="block w-full cursor-pointer transition-transform hover:-translate-y-1" @click="selected = card">
+            <CardImage :src="card.image && lowQuality(card.image)" :alt="card.name" />
+          </button>
           <p class="mt-2 truncate text-sm text-zinc-300">{{ card.name }}</p>
           <p class="text-xs text-zinc-500">{{ TIER_LABELS[card.tier] }} · {{ card.id }}</p>
         </li>
       </ul>
     </template>
+    <CardDetail :card="selected" @close="selected = null" />
   </div>
 </template>
