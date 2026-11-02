@@ -19,6 +19,7 @@ bun run dev
 | `bun run lint`      | ESLint (`lint:fix` to autofix)      |
 | `bun run format`    | Prettier (`format:check` in CI)     |
 | `bun run test`      | Vitest (`test:watch` in watch mode) |
+| `bun run test:e2e`  | Playwright end-to-end tests         |
 
 ## PokéAPI
 
@@ -31,4 +32,4 @@ import type { Pokemon } from 'pokenode-ts'
 const { data } = await usePokeApi<Pokemon>('pokemon/pikachu')
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint, format check, type check, build and tests on every PR and on pushes to `main` and `dev`.
+CI (`.github/workflows/ci.yml`) runs lint, format check, type check, build, unit tests and end-to-end tests on every PR and on pushes to `main` and `dev`.
