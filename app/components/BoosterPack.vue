@@ -2,6 +2,8 @@
 const props = defineProps<{
   name: string
   logo: string | null
+  // Real pack picture: undefined while it is being looked up, null when there is none
+  art?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -12,21 +14,62 @@ const emit = defineEmits<{
 }>()
 
 const TEAR_THRESHOLD = 0.6
+const GENERATED_RATIO = 63 / 105
 
 const packRef = ref<HTMLDivElement>()
 const progress = ref(0)
 const direction = ref<1 | -1>(1)
 const dragging = ref(false)
 const torn = ref(false)
+const tilt = ref({ x: 0, y: 0 })
 let startX = 0
 let width = 1
 
+// The pack only appears once its picture is loaded, so it never swaps design under the user
+const loadedArt = ref<string | null>(null)
+const failedArt = ref<string | null>(null)
+const ratio = ref(GENERATED_RATIO)
+
+watch(() => props.art, (src) => {
+  loadedArt.value = null
+  if (!src || !import.meta.client) return
+  const img = new Image()
+  img.onload = () => {
+    if (props.art !== src) return
+    ratio.value = img.naturalWidth / img.naturalHeight
+    loadedArt.value = src
+  }
+  img.onerror = () => {
+    failedArt.value = src
+  }
+  img.src = src
+}, { immediate: true })
+
+const mode = computed<'loading' | 'art' | 'generated'>(() => {
+  if (props.art === undefined) return 'loading'
+  if (!props.art || failedArt.value === props.art) return 'generated'
+  return loadedArt.value === props.art ? 'art' : 'loading'
+})
+
+const packStyle = computed(() => ({
+  '--dir': direction.value,
+  // Height of the strip above the cut line, as a fraction of the pack
+  '--cut-n': mode.value === 'art' ? 0.1 : 0.14,
+  '--art': mode.value === 'art' ? `url("${props.art}")` : 'none',
+  aspectRatio: mode.value === 'art' ? ratio.value : GENERATED_RATIO
+}))
+
+const tiltStyle = computed(() => ({
+  transform: `perspective(900px) rotateX(${tilt.value.x}deg) rotateY(${tilt.value.y}deg)`
+}))
+
 const onPointerDown = (event: PointerEvent) => {
-  if (torn.value || !packRef.value) return
+  if (torn.value || mode.value === 'loading' || !packRef.value) return
   const rect = packRef.value.getBoundingClientRect()
   // Only the top of the pack can be torn
   if (event.clientY - rect.top > rect.height * 0.35) return
   dragging.value = true
+  tilt.value = { x: 0, y: 0 }
   startX = event.clientX
   width = rect.width
   progress.value = 0
@@ -35,7 +78,14 @@ const onPointerDown = (event: PointerEvent) => {
 }
 
 const onPointerMove = (event: PointerEvent) => {
-  if (!dragging.value) return
+  if (!dragging.value) {
+    if (torn.value || event.pointerType === 'touch' || !packRef.value) return
+    const rect = packRef.value.getBoundingClientRect()
+    const x = (event.clientX - rect.left) / rect.width - 0.5
+    const y = (event.clientY - rect.top) / rect.height - 0.5
+    tilt.value = { x: -y * 12, y: x * 16 }
+    return
+  }
   const dx = event.clientX - startX
   direction.value = dx >= 0 ? 1 : -1
   progress.value = Math.min(1, Math.abs(dx) / (width * 0.8))
@@ -49,12 +99,17 @@ const onPointerUp = () => {
   else progress.value = 0
 }
 
+const onPointerLeave = () => {
+  tilt.value = { x: 0, y: 0 }
+}
+
 const reduce = () => import.meta.client && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 function tear() {
   if (torn.value) return
   dragging.value = false
   progress.value = 1
+  tilt.value = { x: 0, y: 0 }
   torn.value = true
   emit('start')
   setTimeout(() => emit('opened'), reduce() ? 0 : 950)
@@ -76,51 +131,58 @@ watch(() => props.name, () => {
   <div class="flex flex-col items-center">
     <div
       ref="packRef"
-      class="booster relative aspect-[63/105] w-[min(260px,65vw)] touch-none select-none"
-      :class="{ 'is-torn': torn, 'is-dragging': dragging }"
-      :style="{ '--dir': direction }"
+      class="booster relative w-[min(260px,65vw)] touch-none select-none"
+      :class="{ 'is-torn': torn, 'is-dragging': dragging, 'has-art': mode === 'art', 'is-loading': mode === 'loading' }"
+      :style="packStyle"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
+      @pointerleave="onPointerLeave"
     >
       <div class="booster__glow" />
 
-      <!-- Strip above the cut line, flies away when torn -->
-      <div class="booster__flap">
-        <div class="booster__crimp" />
-      </div>
+      <div v-if="mode === 'loading'" class="absolute inset-0 animate-pulse rounded-md bg-zinc-900" />
 
-      <div class="booster__body">
-        <div class="booster__shine" />
-        <div class="relative flex h-full flex-col items-center justify-center gap-4 px-6 pt-6">
-          <img v-if="logo" :src="logo" :alt="name" class="max-h-24 w-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" draggable="false">
-          <p v-else class="text-center text-xl font-black text-white drop-shadow">{{ name }}</p>
-          <div class="mt-4 flex flex-col items-center gap-1">
-            <span class="rounded-full border-2 border-amber-300/90 px-3 py-1 text-xs font-black tracking-widest text-amber-300">PN</span>
-            <span class="text-[10px] font-semibold tracking-[0.3em] text-white/70 uppercase">10 cartes</span>
-          </div>
+      <div v-else class="booster__tilt" :style="tiltStyle">
+        <!-- Strip above the cut line, flies away when torn -->
+        <div class="booster__flap">
+          <div v-if="mode === 'generated'" class="booster__crimp" />
         </div>
-        <div class="booster__crimp booster__crimp--bottom" />
-      </div>
 
-      <!-- Cut line and swipe progress -->
-      <div class="booster__line">
-        <div
-          class="booster__cut"
-          :style="{ transform: `scaleX(${progress})`, transformOrigin: direction === 1 ? 'left' : 'right' }"
-        />
-        <div v-if="!torn && !dragging" class="booster__hint" />
+        <div class="booster__body">
+          <div class="booster__shine" />
+          <div v-if="mode === 'generated'" class="relative flex h-full flex-col items-center justify-center gap-4 px-6 pt-6">
+            <img v-if="logo" :src="logo" :alt="name" class="max-h-24 w-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" draggable="false">
+            <p v-else class="text-center text-xl font-black text-white drop-shadow">{{ name }}</p>
+            <div class="mt-4 flex flex-col items-center gap-1">
+              <span class="rounded-full border-2 border-amber-300/90 px-3 py-1 text-xs font-black tracking-widest text-amber-300">PN</span>
+              <span class="text-[10px] font-semibold tracking-[0.3em] text-white/70 uppercase">10 cartes</span>
+            </div>
+          </div>
+          <span v-else class="sr-only">{{ name }}</span>
+          <div v-if="mode === 'generated'" class="booster__crimp booster__crimp--bottom" />
+        </div>
+
+        <!-- Cut line and swipe progress -->
+        <div class="booster__line">
+          <div
+            class="booster__cut"
+            :style="{ transform: `scaleX(${progress})`, transformOrigin: direction === 1 ? 'left' : 'right' }"
+          />
+          <div v-if="!torn && !dragging" class="booster__hint" />
+        </div>
       </div>
     </div>
 
     <p class="mt-8 h-5 text-sm text-zinc-400" aria-live="polite">
-      <template v-if="!torn">Glisse le long de la ligne pour ouvrir</template>
+      <template v-if="!torn && mode !== 'loading'">Glisse le long de la ligne pour ouvrir</template>
     </p>
     <button
       v-if="!torn"
       type="button"
-      class="mt-2 text-xs text-zinc-600 underline-offset-4 hover:text-zinc-300 hover:underline"
+      class="mt-2 text-xs text-zinc-600 underline-offset-4 hover:text-zinc-300 hover:underline disabled:invisible"
+      :disabled="mode === 'loading'"
       @click="openWithButton"
     >
       Ouvrir sans glisser
@@ -130,7 +192,6 @@ watch(() => props.name, () => {
 
 <style scoped>
 .booster {
-  --cut: 14%;
   animation: float 4s ease-in-out infinite;
   cursor: grab;
 }
@@ -145,6 +206,10 @@ watch(() => props.name, () => {
   cursor: default;
 }
 
+.booster.is-loading {
+  cursor: default;
+}
+
 .booster__glow {
   position: absolute;
   inset: 8%;
@@ -152,6 +217,13 @@ watch(() => props.name, () => {
   background: radial-gradient(closest-side, rgb(250 204 21 / 0.35), transparent);
   filter: blur(30px);
   transform: scale(1.4);
+}
+
+.booster__tilt {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.2s ease-out;
+  animation: appear 0.4s ease-out;
 }
 
 .booster__flap,
@@ -163,26 +235,40 @@ watch(() => props.name, () => {
   background:
     linear-gradient(135deg, rgb(255 255 255 / 0.18), transparent 40%),
     linear-gradient(160deg, #4338ca 0%, #7c3aed 35%, #db2777 70%, #f59e0b 100%);
+  background-repeat: no-repeat;
   box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.8);
 }
 
+.has-art .booster__flap,
+.has-art .booster__body {
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.12), transparent 40%), var(--art);
+}
+
+/* Backgrounds are sized to the whole pack so flap and body line up */
 .booster__flap {
   top: 0;
-  height: var(--cut);
+  height: calc(var(--cut-n) * 100%);
   border-radius: 6px 6px 0 0;
-  /* Gradients sized to the whole pack so flap and body line up */
-  background-size: 100% 100%, 100% calc(100% / 0.14);
+  background-size: 100% 100%, 100% calc(100% / var(--cut-n));
   background-position: 0 0, 0 0;
   transition: transform 0.7s cubic-bezier(0.3, 0.6, 0.4, 1), opacity 0.7s ease;
 }
 
 .booster__body {
-  top: var(--cut);
+  top: calc(var(--cut-n) * 100%);
   bottom: 0;
   border-radius: 0 0 6px 6px;
-  background-size: 100% 100%, 100% calc(100% / 0.86);
+  background-size: 100% 100%, 100% calc(100% / (1 - var(--cut-n)));
   background-position: 0 0, 0 100%;
   transition: transform 0.6s cubic-bezier(0.5, 0, 0.75, 0) 0.35s, opacity 0.5s ease 0.45s;
+}
+
+.has-art .booster__flap {
+  border-radius: 3px 3px 0 0;
+}
+
+.has-art .booster__body {
+  border-radius: 0 0 3px 3px;
 }
 
 .booster__crimp {
@@ -206,14 +292,23 @@ watch(() => props.name, () => {
   pointer-events: none;
 }
 
+.has-art .booster__shine {
+  opacity: 0.6;
+}
+
 .booster__line {
   position: absolute;
-  top: var(--cut);
+  top: calc(var(--cut-n) * 100%);
   left: 4%;
   right: 4%;
   height: 0;
   border-top: 2px dashed rgb(255 255 255 / 0.55);
   pointer-events: none;
+}
+
+.has-art .booster__line {
+  border-top-color: rgb(255 255 255 / 0.8);
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.8));
 }
 
 .booster__cut {
@@ -270,6 +365,13 @@ watch(() => props.name, () => {
   }
 }
 
+@keyframes appear {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
 @keyframes shine {
   0% {
     transform: translateX(-40%);
@@ -299,6 +401,7 @@ watch(() => props.name, () => {
 
 @media (prefers-reduced-motion: reduce) {
   .booster,
+  .booster__tilt,
   .booster__shine,
   .booster__hint {
     animation: none;

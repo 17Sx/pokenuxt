@@ -8,6 +8,14 @@ const { data: sets } = await useAsyncData('sets', () => $orpc.sets.list())
 const setId = ref('sv03.5')
 const selectedSet = computed(() => sets.value?.find(set => set.id === setId.value))
 
+const { data: packArt, status: packArtStatus } = await useAsyncData(
+  'pack-art',
+  () => $orpc.sets.packArt({ setId: setId.value }),
+  { watch: [setId] }
+)
+// undefined tells the booster to wait, null to use the generated design
+const art = computed(() => packArtStatus.value === 'pending' ? undefined : packArt.value?.image ?? null)
+
 type Stage = 'pack' | 'reveal' | 'summary'
 const stage = ref<Stage>('pack')
 const opened = ref<OpenedCard[]>([])
@@ -99,6 +107,7 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
           :key="`${setId}-${packKey}`"
           :name="selectedSet?.name ?? setId"
           :logo="selectedSet?.logo ?? null"
+          :art="art"
           @start="prefetch"
           @opened="onOpened"
         />

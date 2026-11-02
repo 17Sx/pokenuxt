@@ -2,6 +2,7 @@ import { ORPCError, os } from '@orpc/server'
 import { Query } from '@tcgdex/sdk'
 import type { CardModel, CardResumeModel, Quality } from '@tcgdex/sdk'
 import * as z from 'zod'
+import { packArtFor } from '../utils/packArt'
 import { openPack, tierOf } from '../utils/packs'
 import { tcgdex, tcgdexEn } from '../utils/tcgdex'
 
@@ -97,7 +98,11 @@ export const router = {
           cardCount: set.cardCount.total
         }))
         .reverse()
-    })
+    }),
+
+    packArt: base
+      .input(z.object({ setId: z.string().min(1) }))
+      .handler(({ input }) => packArtFor(input.setId))
   },
 
   packs: {
