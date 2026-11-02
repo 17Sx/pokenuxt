@@ -7,11 +7,31 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "@orpc/client": "^1.16.1",
+    "@orpc/server": "^1.16.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tcgdex/sdk": "^2.9.0",
+    "drizzle-orm": "^0.45.4",
     "nuxt": "^4.6.3",
+    "tailwindcss": "^4.3.3",
     "vue": "^3.5.44",
-    "vue-router": "^5.4.0"
+    "vue-router": "^5.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "dotenv": "^18.0.9",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.14"
   }
 }

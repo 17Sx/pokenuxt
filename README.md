@@ -1,75 +1,30 @@
-# Nuxt Minimal Starter
+# PokéNuxt
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Nuxt 4 · Tailwind CSS v4 · Neon + Drizzle · oRPC · TCGdex SDK
 
 ## Setup
 
-Make sure to install dependencies:
-
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
+cp .env.example .env   # fill DATABASE_URL with your Neon connection string
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+## Scripts
 
-Build the application for production:
+| Script | |
+| --- | --- |
+| `npm run dev` | Dev server on http://localhost:3000 |
+| `npm run build` | Production build |
+| `npm run typecheck` | Type check |
+| `npm run db:generate` | Generate SQL migrations from `server/db/schema.ts` |
+| `npm run db:migrate` | Apply migrations |
+| `npm run db:push` | Push the schema directly (prototyping) |
+| `npm run db:studio` | Drizzle Studio |
 
-```bash
-# npm
-npm run build
+## Structure
 
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+- `server/orpc/router.ts` — oRPC procedures (exposed on `/rpc`)
+- `server/db/` — Drizzle schema and Neon client (`useDb()`)
+- `server/utils/tcgdex.ts` — TCGdex SDK instance (French)
+- `app/plugins/orpc.*.ts` — `$orpc` client (HTTP in the browser, direct call during SSR)
