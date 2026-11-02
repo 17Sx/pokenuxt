@@ -2,5 +2,8 @@
 .output
 .data
 node_modules
-package-lock.json
+bun.lock
+test-results
+playwright-report
+blob-report
 server/db/migrations

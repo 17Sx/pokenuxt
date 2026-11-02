@@ -11,17 +11,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: lts/*
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
 
-      - run: npm ci
+      - run: bun install --frozen-lockfile
 
-      - run: npm run lint
+      - run: bun run lint
 
-      - run: npm run format:check
+      - run: bun run format:check
 
-      - run: npm run typecheck
+      - run: bun run typecheck
 
-      - run: npm run build
+      - run: bun run build
+
+      - run: bun run test
+
+      - run: bunx playwright install --with-deps chromium
+
+      - run: bun run test:e2e
