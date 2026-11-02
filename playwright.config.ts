@@ -16,4 +16,12 @@ export default defineConfig<ConfigOptions>({
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // The Hono API the front relays /api to. Locally, a running bun run dev:api
+  // is reused.
+  webServer: {
+    command: 'bun run --cwd api start',
+    url: 'http://localhost:8787/health',
+    reuseExistingServer: !process.env.CI,
+    env: { PORT: '8787' },
+  },
 })
