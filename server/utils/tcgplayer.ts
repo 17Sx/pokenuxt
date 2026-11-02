@@ -1,7 +1,7 @@
 import { tcgdexEn } from './tcgdex'
 
-// TCGdex has no booster images, so they come from the TCGplayer catalogue,
-// mirrored daily by tcgcsv.com (no key needed, a User-Agent is required)
+// Pictures TCGdex lacks (booster packs, energy-only sets) come from the TCGplayer
+// catalogue, mirrored daily by tcgcsv.com (no key needed, a User-Agent is required)
 const TCGCSV = 'https://tcgcsv.com/tcgplayer/3'
 const HEADERS = {
   'User-Agent': 'pokenuxt/0.1 (+https://github.com/17Sx/pokenuxt)',
@@ -18,7 +18,11 @@ interface Group {
 interface Product {
   productId: number
   name: string
+  extendedData?: Array<{ name: string; value: string }>
 }
+
+const productImage = (product: Product) =>
+  `https://tcgplayer-cdn.tcgplayer.com/product/${product.productId}_in_1000x1000.jpg`
 
 export interface PackArt {
   image: string
@@ -130,7 +134,7 @@ async function resolve(setId: string): Promise<PackArt | null> {
   if (!pack) return null
 
   return {
-    image: `https://tcgplayer-cdn.tcgplayer.com/product/${pack.productId}_in_1000x1000.jpg`,
+    image: productImage(pack),
     name: pack.name,
   }
 }
@@ -147,4 +151,32 @@ export function packArtFor(setId: string) {
     arts.set(setId, art)
   }
   return art.value
+}
+
+// Basic energy sets (sve, mee) have no pictures on TCGdex. TCGplayer numbers them
+// the same way, so "sve-002" is "Basic Fire Energy - 002"
+const ENERGY_GROUPS: Record<string, string> = { sve: 'SVE', mee: 'MEE' }
+
+export async function energyImageFor(setId: string, localId: string) {
+  const abbreviation = ENERGY_GROUPS[setId]
+  if (!abbreviation) return null
+  try {
+    const group = (await loadGroups()).find(
+      (group) => group.abbreviation === abbreviation,
+    )
+    if (!group) return null
+    const number = Number.parseInt(localId, 10)
+    const energy = (await loadProducts(group.groupId)).find(
+      (product) =>
+        !/holo/i.test(product.name) &&
+        Number.parseInt(
+          product.extendedData?.find((data) => data.name === 'Number')?.value ??
+            '',
+          10,
+        ) === number,
+    )
+    return energy ? productImage(energy) : null
+  } catch {
+    return null
+  }
 }

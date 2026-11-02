@@ -2,11 +2,13 @@ import { Query } from '@tcgdex/sdk'
 import type { CardResumeModel } from '@tcgdex/sdk'
 import { tcgdex } from './tcgdex'
 
-export type Tier = 'common' | 'uncommon' | 'rare' | 'holo' | 'ultra' | 'secret'
+type RarityTier = 'common' | 'uncommon' | 'rare' | 'holo' | 'ultra' | 'secret'
+// Energies get their own slot, outside rarity odds
+export type Tier = RarityTier | 'energy'
 
 // French rarity names grouped by how hard they are to pull.
 // Classic sets use Commune/Rare…, Pocket sets use diamonds and stars.
-const TIERS: Record<Tier, string[]> = {
+const TIERS: Record<RarityTier, string[]> = {
   common: ['Commune', 'Un Diamant'],
   uncommon: ['Peu Commune', 'Deux Diamants'],
   rare: ['Rare', 'Trois Diamants', 'Rare Noir Blanc'],
@@ -53,20 +55,26 @@ const TIERS: Record<Tier, string[]> = {
   ],
 }
 
+const RARITY_TIERS = Object.keys(TIERS) as RarityTier[]
+
 export const tierOf = (rarity?: string) =>
-  (Object.keys(TIERS) as Tier[]).find(
-    (tier) => rarity && TIERS[tier].includes(rarity),
-  ) ?? null
+  RARITY_TIERS.find((tier) => rarity && TIERS[tier].includes(rarity)) ?? null
 
 // Odds for the rare slot, renormalised over the tiers the set actually has
-const RARE_SLOT_WEIGHTS: Partial<Record<Tier, number>> = {
+const RARE_SLOT_WEIGHTS: Partial<Record<RarityTier, number>> = {
   rare: 65,
   holo: 22,
   ultra: 10,
   secret: 3,
 }
 
-const PACK_LAYOUT = { common: 5, uncommon: 3, bonus: 1, rareSlot: 1 }
+const PACK_LAYOUT = {
+  energy: 1,
+  common: 5,
+  uncommon: 3,
+  bonus: 1,
+  rareSlot: 1,
+}
 
 export interface PackCard {
   card: CardResumeModel
@@ -75,6 +83,22 @@ export interface PackCard {
 
 type Pools = Record<Tier, CardResumeModel[]>
 
+const basicEnergies = (setId: string, commonOnly: boolean) => {
+  const query = Query.create()
+    .equal('set.id', setId)
+    .equal('category', 'Énergie')
+    .equal('energyType', 'De base')
+  if (commonOnly) query.equal('rarity', 'Commune')
+  return tcgdex.card.list(query)
+}
+
+// Recent sets only list gold basic energies: the ones found in packs live in an
+// energy-only set. Pocket has no energy cards at all.
+const energySetFor = (serieId?: string) => {
+  if (serieId === 'tcgp') return null
+  return serieId === 'me' ? 'mee' : 'sve'
+}
+
 // Set contents never change, so pools are kept for the life of the server
 const poolsCache = new Map<string, Promise<Pools>>()
 
@@ -82,25 +106,50 @@ function loadPools(setId: string) {
   let pools = poolsCache.get(setId)
   if (!pools) {
     pools = (async () => {
-      const entries = await Promise.all(
-        (Object.keys(TIERS) as Tier[]).map(
-          async (tier) =>
-            [
-              tier,
-              await tcgdex.card.list(
-                Query.create()
-                  .equal('set.id', setId)
-                  .equal('rarity', TIERS[tier].join('|')),
-              ),
-            ] as const,
-        ),
-      )
-      return Object.fromEntries(entries) as Pools
+      const [entries, ownEnergies, set] = await Promise.all([
+        loadRarityPools(setId),
+        basicEnergies(setId, true),
+        tcgdex.set.get(setId),
+      ])
+      const rarityPools = Object.fromEntries(entries) as Record<
+        RarityTier,
+        CardResumeModel[]
+      >
+      // Old sets file basic energies as commons, they belong to the energy slot only
+      const energyIds = new Set(ownEnergies.map((card) => card.id))
+      for (const tier of RARITY_TIERS) {
+        rarityPools[tier] = rarityPools[tier].filter(
+          (card) => !energyIds.has(card.id),
+        )
+      }
+      const fallback = energySetFor(set?.serie.id)
+      const energy = ownEnergies.length
+        ? ownEnergies
+        : fallback
+          ? await basicEnergies(fallback, false)
+          : []
+      return { ...rarityPools, energy }
     })()
     poolsCache.set(setId, pools)
     pools.catch(() => poolsCache.delete(setId))
   }
   return pools
+}
+
+function loadRarityPools(setId: string) {
+  return Promise.all(
+    RARITY_TIERS.map(
+      async (tier) =>
+        [
+          tier,
+          await tcgdex.card.list(
+            Query.create()
+              .equal('set.id', setId)
+              .equal('rarity', TIERS[tier].join('|')),
+          ),
+        ] as const,
+    ),
+  )
 }
 
 const randomItem = <T>(items: T[]) =>
@@ -120,7 +169,7 @@ function draw(pool: CardResumeModel[], count: number, taken: Set<string>) {
 
 function pickRareTier(pools: Pools) {
   const available = Object.entries(RARE_SLOT_WEIGHTS).filter(
-    ([tier]) => pools[tier as Tier].length,
+    ([tier]) => pools[tier as RarityTier].length,
   )
   const total = available.reduce((sum, [, weight]) => sum + weight, 0)
   let roll = Math.random() * total
@@ -145,6 +194,9 @@ export async function openPack(setId: string): Promise<PackCard[] | null> {
   )
   const rareTier = pickRareTier(pools)
   if (!rareTier && !lowTiers.length) return null
+
+  // Comes first, so the rare is still the last card revealed
+  add('energy', PACK_LAYOUT.energy)
 
   // Sets without commons/uncommons (e.g. special collections) fill the pack from rarer tiers
   const filler = lowTiers[0] ?? rareTier!

@@ -23,6 +23,7 @@ export const TIER_LABELS: Record<Tier, string> = {
   holo: 'Holo',
   ultra: 'Ultra rare',
   secret: 'Secrète',
+  energy: 'Énergie',
 }
 
 export const TIER_ORDER: Tier[] = [
@@ -32,6 +33,7 @@ export const TIER_ORDER: Tier[] = [
   'rare',
   'uncommon',
   'common',
+  'energy',
 ]
 
 export const TIER_COLORS: Record<Tier, string> = {
@@ -41,6 +43,7 @@ export const TIER_COLORS: Record<Tier, string> = {
   holo: 'text-violet-400',
   ultra: 'text-amber-400',
   secret: 'text-rose-400',
+  energy: 'text-emerald-400',
 }
 
 // Glow behind a card as it is revealed, as an RGB triplet

@@ -193,7 +193,7 @@ watch(
               >
               <span
                 class="text-[10px] font-semibold tracking-[0.3em] text-white/70 uppercase"
-                >10 cartes</span
+                >Booster</span
               >
             </div>
           </div>

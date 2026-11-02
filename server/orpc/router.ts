@@ -2,7 +2,7 @@ import { ORPCError, os } from '@orpc/server'
 import { Query } from '@tcgdex/sdk'
 import type { CardModel, CardResumeModel, Quality } from '@tcgdex/sdk'
 import * as z from 'zod'
-import { packArtFor } from '../utils/packArt'
+import { energyImageFor, packArtFor } from '../utils/tcgplayer'
 import { openPack, tierOf } from '../utils/packs'
 import { tcgdex, tcgdexEn } from '../utils/tcgdex'
 
@@ -126,10 +126,14 @@ export const router = {
           })
         }
         return Promise.all(
-          pack.map(async ({ card, tier }) => ({
-            ...(await toCardResume(card, 'high')),
-            tier,
-          })),
+          pack.map(async ({ card, tier }) => {
+            const resume = await toCardResume(card, 'high')
+            if (tier === 'energy' && !resume.image) {
+              const setId = card.id.slice(0, card.id.lastIndexOf('-'))
+              resume.image = await energyImageFor(setId, card.localId)
+            }
+            return { ...resume, tier }
+          }),
         )
       }),
   },
