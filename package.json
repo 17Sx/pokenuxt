@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -23,11 +25,15 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
+    "@nuxt/test-utils": "^4.3.4",
+    "@vue/test-utils": "^2.5.1",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
+    "happy-dom": "^21.0.4",
     "pokenode-ts": "^5.0.0",
     "prettier": "^3.9.10",
     "typescript": "^6.0.3",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.14"
   }
 }

@@ -5,19 +5,20 @@ Nuxt 4 · Tailwind CSS v4 · données [PokéAPI](https://pokeapi.co)
 ## Setup
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 ## Scripts
 
 | Script              |                                     |
 | ------------------- | ----------------------------------- |
-| `npm run dev`       | Dev server on http://localhost:3000 |
-| `npm run build`     | Production build                    |
-| `npm run typecheck` | Type check                          |
-| `npm run lint`      | ESLint (`lint:fix` to autofix)      |
-| `npm run format`    | Prettier (`format:check` in CI)     |
+| `bun run dev`       | Dev server on http://localhost:3000 |
+| `bun run build`     | Production build                    |
+| `bun run typecheck` | Type check                          |
+| `bun run lint`      | ESLint (`lint:fix` to autofix)      |
+| `bun run format`    | Prettier (`format:check` in CI)     |
+| `bun run test`      | Vitest (`test:watch` in watch mode) |
 
 ## PokéAPI
 
@@ -30,4 +31,4 @@ import type { Pokemon } from 'pokenode-ts'
 const { data } = await usePokeApi<Pokemon>('pokemon/pikachu')
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint, format check, type check and build on every PR and on pushes to `main` and `dev`.
+CI (`.github/workflows/ci.yml`) runs lint, format check, type check, build and tests on every PR and on pushes to `main` and `dev`.
