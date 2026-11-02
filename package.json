@@ -47,5 +47,8 @@
   },
   "workspaces": [
     "api"
-  ]
+  ],
+  "overrides": {
+    "glob": "^14.0.3"
+  }
 }
