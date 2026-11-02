@@ -17,18 +17,22 @@ let start = { x: 0, y: 0, time: 0 }
 const current = computed(() => props.cards[index.value])
 const next = computed(() => props.cards[index.value + 1])
 const remaining = computed(() => props.cards.length - index.value - 1)
-const glow = computed(() => current.value ? TIER_GLOW[current.value.tier] : undefined)
+const glow = computed(() =>
+  current.value ? TIER_GLOW[current.value.tier] : undefined,
+)
 
 const cardStyle = computed(() => {
   if (flying.value) {
     return {
       transform: `translate(${flying.value * 130}vw, ${dy.value}px) rotate(${flying.value * 30}deg)`,
-      transition: `transform ${FLY_DURATION}ms cubic-bezier(0.5, 0, 0.9, 0.5)`
+      transition: `transform ${FLY_DURATION}ms cubic-bezier(0.5, 0, 0.9, 0.5)`,
     }
   }
   return {
     transform: `translate(${dx.value}px, ${dy.value * 0.3}px) rotate(${dx.value / 18}deg)`,
-    transition: dragging.value ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3)'
+    transition: dragging.value
+      ? 'none'
+      : 'transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3)',
   }
 })
 
@@ -60,7 +64,10 @@ const onPointerMove = (event: PointerEvent) => {
 const onPointerUp = () => {
   if (!dragging.value) return
   dragging.value = false
-  const isTap = Math.abs(dx.value) < 8 && Math.abs(dy.value) < 8 && performance.now() - start.time < 300
+  const isTap =
+    Math.abs(dx.value) < 8 &&
+    Math.abs(dy.value) < 8 &&
+    performance.now() - start.time < 300
   if (isTap) advance(1)
   else if (Math.abs(dx.value) > SWIPE_DISTANCE) advance(dx.value > 0 ? 1 : -1)
   else {
@@ -73,8 +80,7 @@ const onKeydown = (event: KeyboardEvent) => {
   if (['ArrowRight', 'Enter', ' '].includes(event.key)) {
     event.preventDefault()
     advance(1)
-  }
-  else if (event.key === 'ArrowLeft') {
+  } else if (event.key === 'ArrowLeft') {
     event.preventDefault()
     advance(-1)
   }
@@ -92,12 +98,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         v-for="depth in Math.min(remaining, 3)"
         :key="`edge-${depth}`"
         class="absolute inset-0 rounded-xl bg-zinc-800 shadow-lg"
-        :style="{ transform: `translateY(${depth * 6}px) scale(${1 - depth * 0.03})`, opacity: 1 - depth * 0.25 }"
+        :style="{
+          transform: `translateY(${depth * 6}px) scale(${1 - depth * 0.03})`,
+          opacity: 1 - depth * 0.25,
+        }"
       />
 
       <!-- Next card waits underneath so it is already loaded -->
       <div v-if="next" :key="`next-${index}`" class="absolute inset-0">
-        <CardImage :src="next.image && highQuality(next.image)" :alt="next.name" :lazy="false" class="!rounded-xl" />
+        <CardImage
+          :src="next.image && highQuality(next.image)"
+          :alt="next.name"
+          :lazy="false"
+          class="!rounded-xl"
+        />
       </div>
 
       <!-- Halo behind rare cards -->
@@ -132,23 +146,43 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :hover-scale="1"
           class="!w-full"
         />
-        <CardImage v-else :src="current.image && highQuality(current.image)" :alt="current.name" :lazy="false" class="!rounded-xl shadow-2xl">
+        <CardImage
+          v-else
+          :src="current.image && highQuality(current.image)"
+          :alt="current.name"
+          :lazy="false"
+          class="!rounded-xl shadow-2xl"
+        >
           {{ current.name }}
         </CardImage>
       </div>
     </div>
 
-    <div v-if="current" :key="`info-${index}`" class="reveal-info mt-8 flex h-16 flex-col items-center text-center">
+    <div
+      v-if="current"
+      :key="`info-${index}`"
+      class="reveal-info mt-8 flex h-16 flex-col items-center text-center"
+    >
       <p class="flex items-center gap-2 text-lg font-semibold text-zinc-100">
         {{ current.name }}
-        <span v-if="current.isNew" class="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-emerald-950 uppercase">Nouvelle</span>
+        <span
+          v-if="current.isNew"
+          class="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-emerald-950 uppercase"
+          >Nouvelle</span
+        >
       </p>
-      <p class="text-sm font-medium" :class="TIER_COLORS[current.tier]">{{ TIER_LABELS[current.tier] }}</p>
+      <p class="text-sm font-medium" :class="TIER_COLORS[current.tier]">
+        {{ TIER_LABELS[current.tier] }}
+      </p>
     </div>
 
     <div class="mt-4 flex items-center gap-6 text-sm text-zinc-500">
       <span>{{ index + 1 }} / {{ cards.length }}</span>
-      <button type="button" class="underline-offset-4 hover:text-zinc-200 hover:underline" @click="emit('done')">
+      <button
+        type="button"
+        class="underline-offset-4 hover:text-zinc-200 hover:underline"
+        @click="emit('done')"
+      >
         Tout voir
       </button>
     </div>
@@ -166,9 +200,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .reveal-glow {
-  background: radial-gradient(closest-side, rgb(var(--glow) / 0.55), rgb(var(--glow) / 0.15) 60%, transparent);
+  background: radial-gradient(
+    closest-side,
+    rgb(var(--glow) / 0.55),
+    rgb(var(--glow) / 0.15) 60%,
+    transparent
+  );
   filter: blur(20px);
-  animation: glow-pulse 2.4s ease-in-out infinite, glow-in 0.6s ease-out;
+  animation:
+    glow-pulse 2.4s ease-in-out infinite,
+    glow-in 0.6s ease-out;
 }
 
 .reveal-info {
@@ -198,7 +239,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.85;
   }
   50% {

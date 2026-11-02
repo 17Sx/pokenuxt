@@ -12,17 +12,17 @@ npm run dev
 
 ## Scripts
 
-| Script | |
-| --- | --- |
-| `npm run dev` | Dev server on http://localhost:3000 |
-| `npm run build` | Production build |
-| `npm run typecheck` | Type check |
-| `npm run lint` | ESLint (`lint:fix` to autofix) |
-| `npm run format` | Prettier (`format:check` in CI) |
+| Script                |                                                    |
+| --------------------- | -------------------------------------------------- |
+| `npm run dev`         | Dev server on http://localhost:3000                |
+| `npm run build`       | Production build                                   |
+| `npm run typecheck`   | Type check                                         |
+| `npm run lint`        | ESLint (`lint:fix` to autofix)                     |
+| `npm run format`      | Prettier (`format:check` in CI)                    |
 | `npm run db:generate` | Generate SQL migrations from `server/db/schema.ts` |
-| `npm run db:migrate` | Apply migrations |
-| `npm run db:push` | Push the schema directly (prototyping) |
-| `npm run db:studio` | Drizzle Studio |
+| `npm run db:migrate`  | Apply migrations                                   |
+| `npm run db:push`     | Push the schema directly (prototyping)             |
+| `npm run db:studio`   | Drizzle Studio                                     |
 
 ## Structure
 

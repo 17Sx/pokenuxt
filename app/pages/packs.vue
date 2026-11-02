@@ -6,15 +6,21 @@ const { cards: owned, add } = useCollection()
 
 const { data: sets } = await useAsyncData('sets', () => $orpc.sets.list())
 const setId = ref('sv03.5')
-const selectedSet = computed(() => sets.value?.find(set => set.id === setId.value))
+const selectedSet = computed(() =>
+  sets.value?.find((set) => set.id === setId.value),
+)
 
 const { data: packArt, status: packArtStatus } = await useAsyncData(
   'pack-art',
   () => $orpc.sets.packArt({ setId: setId.value }),
-  { watch: [setId] }
+  { watch: [setId] },
 )
 // undefined tells the booster to wait, null to use the generated design
-const art = computed(() => packArtStatus.value === 'pending' ? undefined : packArt.value?.image ?? null)
+const art = computed(() =>
+  packArtStatus.value === 'pending'
+    ? undefined
+    : (packArt.value?.image ?? null),
+)
 
 type Stage = 'pack' | 'reveal' | 'summary'
 const stage = ref<Stage>('pack')
@@ -30,19 +36,28 @@ let generation = 0
 // Remounts the booster with a fresh, untorn pack
 const packKey = ref(0)
 
-const preload = (pack: Pack) => Promise.all(pack.map(card => new Promise<void>((resolve) => {
-  if (!card.image) return resolve()
-  const img = new Image()
-  img.onload = img.onerror = () => resolve()
-  img.src = highQuality(card.image)
-})))
+const preload = (pack: Pack) =>
+  Promise.all(
+    pack.map(
+      (card) =>
+        new Promise<void>((resolve) => {
+          if (!card.image) return resolve()
+          const img = new Image()
+          img.onload = img.onerror = () => resolve()
+          img.src = highQuality(card.image)
+        }),
+    ),
+  )
 
 // Starts as soon as the user begins tearing, so the pack is usually ready when the animation ends
 function prefetch() {
   if (request) return
   errorMessage.value = ''
   request = $orpc.packs.open({ setId: setId.value }).then(async (pack) => {
-    await Promise.race([preload(pack), new Promise(resolve => setTimeout(resolve, 3000))])
+    await Promise.race([
+      preload(pack),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ])
     return pack
   })
   request.catch(() => {
@@ -57,21 +72,20 @@ async function onOpened() {
   try {
     const pack = await request!
     if (current !== generation) return
-    opened.value = pack.map(card => ({
+    opened.value = pack.map((card) => ({
       id: card.id,
       name: card.name,
       image: card.image,
       tier: card.tier,
-      isNew: !owned.value[card.id]
+      isNew: !owned.value[card.id],
     }))
     add(pack)
     stage.value = 'reveal'
-  }
-  catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Impossible d’ouvrir ce pack'
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : 'Impossible d’ouvrir ce pack'
     packKey.value++
-  }
-  finally {
+  } finally {
     request = null
     waiting.value = false
   }
@@ -87,21 +101,32 @@ function newPack() {
 
 watch(setId, newPack)
 
-const rareCount = computed(() => opened.value.filter(card => isHolo(card.tier)).length)
-const newCount = computed(() => opened.value.filter(card => card.isNew).length)
+const rareCount = computed(
+  () => opened.value.filter((card) => isHolo(card.tier)).length,
+)
+const newCount = computed(
+  () => opened.value.filter((card) => card.isNew).length,
+)
 
-const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500'
+const selectClass =
+  'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500'
 </script>
 
 <template>
   <div class="flex flex-col items-center">
     <template v-if="stage === 'pack'">
-      <select v-model="setId" :class="[selectClass, 'w-full max-w-sm']" aria-label="Extension">
+      <select
+        v-model="setId"
+        :class="[selectClass, 'w-full max-w-sm']"
+        aria-label="Extension"
+      >
         <option v-for="set in sets" :key="set.id" :value="set.id">
           {{ set.name }} ({{ set.id }})
         </option>
       </select>
-      <p v-if="errorMessage" class="mt-4 text-center text-sm text-red-400">{{ errorMessage }}</p>
+      <p v-if="errorMessage" class="mt-4 text-center text-sm text-red-400">
+        {{ errorMessage }}
+      </p>
       <div class="mt-12">
         <BoosterPack
           :key="`${setId}-${packKey}`"
@@ -112,17 +137,25 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
           @opened="onOpened"
         />
       </div>
-      <p v-if="waiting" class="mt-4 text-sm text-zinc-500">Préparation du pack…</p>
+      <p v-if="waiting" class="mt-4 text-sm text-zinc-500">
+        Préparation du pack…
+      </p>
     </template>
 
-    <PackReveal v-else-if="stage === 'reveal'" :cards="opened" class="mt-4" @done="stage = 'summary'" />
+    <PackReveal
+      v-else-if="stage === 'reveal'"
+      :cards="opened"
+      class="mt-4"
+      @done="stage = 'summary'"
+    />
 
     <div v-else class="w-full">
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="text-2xl font-bold">{{ selectedSet?.name }}</h2>
           <p class="mt-1 text-sm text-zinc-400">
-            {{ newCount }} nouvelle{{ newCount > 1 ? 's' : '' }} · {{ rareCount }} rare{{ rareCount > 1 ? 's' : '' }}
+            {{ newCount }} nouvelle{{ newCount > 1 ? 's' : '' }} ·
+            {{ rareCount }} rare{{ rareCount > 1 ? 's' : '' }}
           </p>
         </div>
         <div class="flex flex-wrap gap-3">
@@ -133,7 +166,10 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
           >
             Ouvrir un autre pack
           </button>
-          <NuxtLink to="/collection" class="rounded-lg border border-zinc-800 px-4 py-2 text-sm hover:border-zinc-600">
+          <NuxtLink
+            to="/collection"
+            class="rounded-lg border border-zinc-800 px-4 py-2 text-sm hover:border-zinc-600"
+          >
             Voir la collection
           </NuxtLink>
         </div>
@@ -148,17 +184,34 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
           <button
             type="button"
             class="relative block w-full cursor-pointer rounded-lg transition-transform hover:-translate-y-1"
-            :class="{ 'ring-2 ring-offset-2 ring-offset-zinc-950': isHolo(card.tier) }"
-            :style="isHolo(card.tier) ? { '--tw-ring-color': `rgb(${TIER_GLOW[card.tier]})` } : undefined"
+            :class="{
+              'ring-2 ring-offset-2 ring-offset-zinc-950': isHolo(card.tier),
+            }"
+            :style="
+              isHolo(card.tier)
+                ? { '--tw-ring-color': `rgb(${TIER_GLOW[card.tier]})` }
+                : undefined
+            "
             @click="selected = card"
           >
-            <CardImage :src="card.image && lowQuality(card.image)" :alt="card.name" />
+            <CardImage
+              :src="card.image && lowQuality(card.image)"
+              :alt="card.name"
+            />
           </button>
-          <p class="mt-2 flex items-center gap-1 truncate text-sm text-zinc-300">
+          <p
+            class="mt-2 flex items-center gap-1 truncate text-sm text-zinc-300"
+          >
             <span class="truncate">{{ card.name }}</span>
-            <span v-if="card.isNew" class="shrink-0 rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-emerald-950 uppercase">Nouvelle</span>
+            <span
+              v-if="card.isNew"
+              class="shrink-0 rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-emerald-950 uppercase"
+              >Nouvelle</span
+            >
           </p>
-          <p class="text-xs" :class="TIER_COLORS[card.tier]">{{ TIER_LABELS[card.tier] }}</p>
+          <p class="text-xs" :class="TIER_COLORS[card.tier]">
+            {{ TIER_LABELS[card.tier] }}
+          </p>
         </li>
       </ul>
     </div>

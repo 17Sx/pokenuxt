@@ -17,27 +17,38 @@ watch(query, (value) => {
 })
 onBeforeUnmount(() => clearTimeout(timer))
 
-const hasCriteria = computed(() => Boolean(search.value || filters.type || filters.rarity || filters.category))
+const hasCriteria = computed(() =>
+  Boolean(search.value || filters.type || filters.rarity || filters.category),
+)
 
-const { data: options } = await useAsyncData('card-filters', () => $orpc.cards.filters())
+const { data: options } = await useAsyncData('card-filters', () =>
+  $orpc.cards.filters(),
+)
 
-const { data: cards, status, error } = await useAsyncData(
+const {
+  data: cards,
+  status,
+  error,
+} = await useAsyncData(
   'cards',
-  () => hasCriteria.value
-    ? $orpc.cards.search({
-        name: search.value,
-        type: filters.type || undefined,
-        rarity: filters.rarity || undefined,
-        category: filters.category || undefined
-      })
-    : Promise.resolve([]),
-  { watch: [search, filters] }
+  () =>
+    hasCriteria.value
+      ? $orpc.cards.search({
+          name: search.value,
+          type: filters.type || undefined,
+          rarity: filters.rarity || undefined,
+          category: filters.category || undefined,
+        })
+      : Promise.resolve([]),
+  { watch: [search, filters] },
 )
 
 const selected = ref<CardSummary | null>(null)
 
-const resetFilters = () => Object.assign(filters, { type: '', rarity: '', category: '' })
-const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500'
+const resetFilters = () =>
+  Object.assign(filters, { type: '', rarity: '', category: '' })
+const selectClass =
+  'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500'
 </script>
 
 <template>
@@ -49,24 +60,42 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
           type="search"
           class="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 pr-10 outline-none focus:border-zinc-500"
           placeholder="Rechercher une carte…"
-        >
+        />
         <span
           v-if="status === 'pending'"
           class="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-200"
           aria-label="Chargement"
         />
       </div>
-      <select v-model="filters.category" :class="selectClass" aria-label="Catégorie">
+      <select
+        v-model="filters.category"
+        :class="selectClass"
+        aria-label="Catégorie"
+      >
         <option value="">Toutes catégories</option>
-        <option v-for="category in options?.categories" :key="category" :value="category">{{ category }}</option>
+        <option
+          v-for="category in options?.categories"
+          :key="category"
+          :value="category"
+        >
+          {{ category }}
+        </option>
       </select>
       <select v-model="filters.type" :class="selectClass" aria-label="Type">
         <option value="">Tous types</option>
-        <option v-for="type in options?.types" :key="type" :value="type">{{ type }}</option>
+        <option v-for="type in options?.types" :key="type" :value="type">
+          {{ type }}
+        </option>
       </select>
       <select v-model="filters.rarity" :class="selectClass" aria-label="Rareté">
         <option value="">Toutes raretés</option>
-        <option v-for="rarity in options?.rarities" :key="rarity" :value="rarity">{{ rarity }}</option>
+        <option
+          v-for="rarity in options?.rarities"
+          :key="rarity"
+          :value="rarity"
+        >
+          {{ rarity }}
+        </option>
       </select>
       <button
         v-if="filters.type || filters.rarity || filters.category"
@@ -78,7 +107,10 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
       </button>
     </div>
     <p v-if="error" class="mt-6 text-red-400">{{ error.message }}</p>
-    <p v-else-if="hasCriteria && status === 'success' && !cards?.length" class="mt-6 text-zinc-500">
+    <p
+      v-else-if="hasCriteria && status === 'success' && !cards?.length"
+      class="mt-6 text-zinc-500"
+    >
       Aucune carte trouvée
     </p>
     <ul
@@ -93,10 +125,16 @@ const selectClass = 'rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 tex
         >
           ×{{ owned[card.id]!.count }}
         </span>
-        <button type="button" class="block w-full cursor-pointer transition-transform hover:-translate-y-1" @click="selected = card">
+        <button
+          type="button"
+          class="block w-full cursor-pointer transition-transform hover:-translate-y-1"
+          @click="selected = card"
+        >
           <CardImage :src="card.image" :alt="card.name" />
         </button>
-        <p class="mt-2 truncate text-sm text-zinc-400">{{ card.name }} · {{ card.id }}</p>
+        <p class="mt-2 truncate text-sm text-zinc-400">
+          {{ card.name }} · {{ card.id }}
+        </p>
       </li>
     </ul>
     <CardDetail :card="selected" @close="selected = null" />

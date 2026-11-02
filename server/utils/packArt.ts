@@ -3,7 +3,9 @@ import { tcgdexEn } from './tcgdex'
 // TCGdex has no booster images, so they come from the TCGplayer catalogue,
 // mirrored daily by tcgcsv.com (no key needed, a User-Agent is required)
 const TCGCSV = 'https://tcgcsv.com/tcgplayer/3'
-const HEADERS = { 'User-Agent': 'pokenuxt/0.1 (+https://github.com/17Sx/pokenuxt)' }
+const HEADERS = {
+  'User-Agent': 'pokenuxt/0.1 (+https://github.com/17Sx/pokenuxt)',
+}
 const DAY = 24 * 60 * 60 * 1000
 
 interface Group {
@@ -23,13 +25,15 @@ export interface PackArt {
   name: string
 }
 
-let groups: { at: number, value: Promise<Group[]> } | undefined
+let groups: { at: number; value: Promise<Group[]> } | undefined
 const products = new Map<number, Promise<Product[]>>()
-const arts = new Map<string, { at: number, value: Promise<PackArt | null> }>()
+const arts = new Map<string, { at: number; value: Promise<PackArt | null> }>()
 
 function loadGroups() {
   if (!groups || Date.now() - groups.at > DAY) {
-    const value = $fetch<{ results: Group[] }>(`${TCGCSV}/groups`, { headers: HEADERS }).then(res => res.results)
+    const value = $fetch<{ results: Group[] }>(`${TCGCSV}/groups`, {
+      headers: HEADERS,
+    }).then((res) => res.results)
     groups = { at: Date.now(), value }
     value.catch(() => {
       groups = undefined
@@ -41,7 +45,9 @@ function loadGroups() {
 function loadProducts(groupId: number) {
   let value = products.get(groupId)
   if (!value) {
-    value = $fetch<{ results: Product[] }>(`${TCGCSV}/${groupId}/products`, { headers: HEADERS }).then(res => res.results)
+    value = $fetch<{ results: Product[] }>(`${TCGCSV}/${groupId}/products`, {
+      headers: HEADERS,
+    }).then((res) => res.results)
     products.set(groupId, value)
     value.catch(() => products.delete(groupId))
   }
@@ -49,27 +55,37 @@ function loadProducts(groupId: number) {
 }
 
 // "SWSH07: Evolving Skies" and "EX Evolving Skies" both become "evolving skies", "&" reads as "and"
-const normalize = (name: string) => name
-  .toLowerCase()
-  .normalize('NFD')
-  .replace(/[̀-ͯ]/g, '')
-  .replace(/^[a-z0-9&.]{1,8}\s*(?::|-)\s+/, '')
-  .replace(/^ex\s+/, '')
-  .replace(/&/g, ' and ')
-  .replace(/[^a-z0-9]+/g, ' ')
-  .trim()
+const normalize = (name: string) =>
+  name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/^[a-z0-9&.]{1,8}\s*(?::|-)\s+/, '')
+    .replace(/^ex\s+/, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 
-const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / DAY
+const days = (a: string, b: string) =>
+  Math.abs(Date.parse(a) - Date.parse(b)) / DAY
 
 // Abbreviations collide between eras (BST is both Battle Styles and Battle Stadium),
 // so every signal adds up and the best score wins
-function scoreGroup(group: Group, set: { name: string, abbreviation?: string, releaseDate?: string }) {
+function scoreGroup(
+  group: Group,
+  set: { name: string; abbreviation?: string; releaseDate?: string },
+) {
   const groupName = normalize(group.name)
   const setName = normalize(set.name)
   let score = 0
   if (groupName === setName) score += 100
-  else if (groupName.includes(setName) || setName.includes(groupName)) score += 30
-  if (set.abbreviation && group.abbreviation?.toLowerCase() === set.abbreviation.toLowerCase()) score += 50
+  else if (groupName.includes(setName) || setName.includes(groupName))
+    score += 30
+  if (
+    set.abbreviation &&
+    group.abbreviation?.toLowerCase() === set.abbreviation.toLowerCase()
+  )
+    score += 50
   if (set.releaseDate) {
     const gap = days(group.publishedOn, set.releaseDate)
     if (gap < 1) score += 40
@@ -81,8 +97,10 @@ function scoreGroup(group: Group, set: { name: string, abbreviation?: string, re
 }
 
 const isBoosterPack = (product: Product) =>
-  /booster pack/i.test(product.name)
-  && !/code card|case|display|box|bundle|blister|collection|lot|sleeved/i.test(product.name)
+  /booster pack/i.test(product.name) &&
+  !/code card|case|display|box|bundle|blister|collection|lot|sleeved/i.test(
+    product.name,
+  )
 
 // Plain "X Booster Pack" first, then variants such as [Unlimited Edition] before [1st Edition]
 const packRank = (product: Product) =>
@@ -91,11 +109,17 @@ const packRank = (product: Product) =>
 async function resolve(setId: string): Promise<PackArt | null> {
   const set = await tcgdexEn.set.get(setId)
   if (!set) return null
-  const { abbreviation } = set as typeof set & { abbreviation?: { official?: string } }
-  const target = { name: set.name, abbreviation: abbreviation?.official, releaseDate: set.releaseDate }
+  const { abbreviation } = set as typeof set & {
+    abbreviation?: { official?: string }
+  }
+  const target = {
+    name: set.name,
+    abbreviation: abbreviation?.official,
+    releaseDate: set.releaseDate,
+  }
 
   const best = (await loadGroups())
-    .map(group => ({ group, score: scoreGroup(group, target) }))
+    .map((group) => ({ group, score: scoreGroup(group, target) }))
     .filter(({ score }) => score >= 60)
     .sort((a, b) => b.score - a.score)[0]
   if (!best) return null
@@ -107,7 +131,7 @@ async function resolve(setId: string): Promise<PackArt | null> {
 
   return {
     image: `https://tcgplayer-cdn.tcgplayer.com/product/${pack.productId}_in_1000x1000.jpg`,
-    name: pack.name
+    name: pack.name,
   }
 }
 

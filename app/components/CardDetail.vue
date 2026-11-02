@@ -11,35 +11,43 @@ type Details = Awaited<ReturnType<typeof $orpc.cards.get>>
 const details = ref<Details | null>(null)
 const loading = ref(false)
 
-watch(() => props.card?.id, async (id) => {
-  details.value = null
-  if (!id) return
-  loading.value = true
-  try {
-    const result = await $orpc.cards.get({ id })
-    if (props.card?.id === id) details.value = result
-  }
-  catch {
-    // Details are a bonus: the card itself is still shown
-  }
-  finally {
-    loading.value = false
-  }
-}, { immediate: true })
+watch(
+  () => props.card?.id,
+  async (id) => {
+    details.value = null
+    if (!id) return
+    loading.value = true
+    try {
+      const result = await $orpc.cards.get({ id })
+      if (props.card?.id === id) details.value = result
+    } catch {
+      // Details are a bonus: the card itself is still shown
+    } finally {
+      loading.value = false
+    }
+  },
+  { immediate: true },
+)
 
 const tier = computed(() => props.card?.tier ?? details.value?.tier ?? null)
-const image = computed(() => props.card?.image ? highQuality(props.card.image) : null)
+const image = computed(() =>
+  props.card?.image ? highQuality(props.card.image) : null,
+)
 
 const onKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') emit('close')
 }
 
-watch(() => Boolean(props.card), (open) => {
-  if (!import.meta.client) return
-  document.body.style.overflow = open ? 'hidden' : ''
-  if (open) window.addEventListener('keydown', onKeydown)
-  else window.removeEventListener('keydown', onKeydown)
-}, { immediate: true })
+watch(
+  () => Boolean(props.card),
+  (open) => {
+    if (!import.meta.client) return
+    document.body.style.overflow = open ? 'hidden' : ''
+    if (open) window.addEventListener('keydown', onKeydown)
+    else window.removeEventListener('keydown', onKeydown)
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   if (!import.meta.client) return
@@ -67,7 +75,10 @@ onBeforeUnmount(() => {
         >
           ×
         </button>
-        <div class="flex min-h-full flex-col items-center justify-center gap-8 px-4 py-16 md:flex-row md:gap-12" @click.self="emit('close')">
+        <div
+          class="flex min-h-full flex-col items-center justify-center gap-8 px-4 py-16 md:flex-row md:gap-12"
+          @click.self="emit('close')"
+        >
           <div class="detail-card w-full max-w-[340px]">
             <HoloCard
               v-if="image"
@@ -82,21 +93,32 @@ onBeforeUnmount(() => {
               :tilt-max="18"
               class="w-full"
             />
-            <CardImage v-else :src="null" :alt="card.name">{{ card.name }}</CardImage>
+            <CardImage v-else :src="null" :alt="card.name">{{
+              card.name
+            }}</CardImage>
           </div>
 
           <div class="w-full max-w-sm text-zinc-300">
             <h2 class="text-2xl font-bold text-zinc-100">{{ card.name }}</h2>
             <p class="mt-1 text-sm text-zinc-500">{{ card.id }}</p>
-            <p v-if="tier" class="mt-3 text-sm font-semibold" :class="TIER_COLORS[tier]">
+            <p
+              v-if="tier"
+              class="mt-3 text-sm font-semibold"
+              :class="TIER_COLORS[tier]"
+            >
               {{ details?.rarity ?? TIER_LABELS[tier] }}
             </p>
             <p v-if="owned[card.id]" class="mt-2 text-sm text-emerald-400">
               Dans ta collection ×{{ owned[card.id]!.count }}
             </p>
 
-            <p v-if="loading" class="mt-6 text-sm text-zinc-500">Chargement des détails…</p>
-            <dl v-else-if="details" class="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+            <p v-if="loading" class="mt-6 text-sm text-zinc-500">
+              Chargement des détails…
+            </p>
+            <dl
+              v-else-if="details"
+              class="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm"
+            >
               <dt class="text-zinc-500">Extension</dt>
               <dd>{{ details.set.name }}</dd>
               <dt class="text-zinc-500">Catégorie</dt>
@@ -118,7 +140,10 @@ onBeforeUnmount(() => {
                 <dd>{{ details.illustrator }}</dd>
               </template>
             </dl>
-            <p v-if="details?.description" class="mt-6 text-sm leading-relaxed text-zinc-400 italic">
+            <p
+              v-if="details?.description"
+              class="mt-6 text-sm leading-relaxed text-zinc-400 italic"
+            >
               {{ details.description }}
             </p>
           </div>

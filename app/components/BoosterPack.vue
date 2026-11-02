@@ -30,20 +30,24 @@ const loadedArt = ref<string | null>(null)
 const failedArt = ref<string | null>(null)
 const ratio = ref(GENERATED_RATIO)
 
-watch(() => props.art, (src) => {
-  loadedArt.value = null
-  if (!src || !import.meta.client) return
-  const img = new Image()
-  img.onload = () => {
-    if (props.art !== src) return
-    ratio.value = img.naturalWidth / img.naturalHeight
-    loadedArt.value = src
-  }
-  img.onerror = () => {
-    failedArt.value = src
-  }
-  img.src = src
-}, { immediate: true })
+watch(
+  () => props.art,
+  (src) => {
+    loadedArt.value = null
+    if (!src || !import.meta.client) return
+    const img = new Image()
+    img.onload = () => {
+      if (props.art !== src) return
+      ratio.value = img.naturalWidth / img.naturalHeight
+      loadedArt.value = src
+    }
+    img.onerror = () => {
+      failedArt.value = src
+    }
+    img.src = src
+  },
+  { immediate: true },
+)
 
 const mode = computed<'loading' | 'art' | 'generated'>(() => {
   if (props.art === undefined) return 'loading'
@@ -56,11 +60,11 @@ const packStyle = computed(() => ({
   // Height of the strip above the cut line, as a fraction of the pack
   '--cut-n': mode.value === 'art' ? 0.1 : 0.14,
   '--art': mode.value === 'art' ? `url("${props.art}")` : 'none',
-  aspectRatio: mode.value === 'art' ? ratio.value : GENERATED_RATIO
+  aspectRatio: mode.value === 'art' ? ratio.value : GENERATED_RATIO,
 }))
 
 const tiltStyle = computed(() => ({
-  transform: `perspective(900px) rotateX(${tilt.value.x}deg) rotateY(${tilt.value.y}deg)`
+  transform: `perspective(900px) rotateX(${tilt.value.x}deg) rotateY(${tilt.value.y}deg)`,
 }))
 
 const onPointerDown = (event: PointerEvent) => {
@@ -103,7 +107,9 @@ const onPointerLeave = () => {
   tilt.value = { x: 0, y: 0 }
 }
 
-const reduce = () => import.meta.client && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+const reduce = () =>
+  import.meta.client &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 function tear() {
   if (torn.value) return
@@ -121,10 +127,13 @@ const openWithButton = () => {
   tear()
 }
 
-watch(() => props.name, () => {
-  torn.value = false
-  progress.value = 0
-})
+watch(
+  () => props.name,
+  () => {
+    torn.value = false
+    progress.value = 0
+  },
+)
 </script>
 
 <template>
@@ -132,7 +141,12 @@ watch(() => props.name, () => {
     <div
       ref="packRef"
       class="booster relative w-[min(260px,65vw)] touch-none select-none"
-      :class="{ 'is-torn': torn, 'is-dragging': dragging, 'has-art': mode === 'art', 'is-loading': mode === 'loading' }"
+      :class="{
+        'is-torn': torn,
+        'is-dragging': dragging,
+        'has-art': mode === 'art',
+        'is-loading': mode === 'loading',
+      }"
       :style="packStyle"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -142,7 +156,10 @@ watch(() => props.name, () => {
     >
       <div class="booster__glow" />
 
-      <div v-if="mode === 'loading'" class="absolute inset-0 animate-pulse rounded-md bg-zinc-900" />
+      <div
+        v-if="mode === 'loading'"
+        class="absolute inset-0 animate-pulse rounded-md bg-zinc-900"
+      />
 
       <div v-else class="booster__tilt" :style="tiltStyle">
         <!-- Strip above the cut line, flies away when torn -->
@@ -152,23 +169,49 @@ watch(() => props.name, () => {
 
         <div class="booster__body">
           <div class="booster__shine" />
-          <div v-if="mode === 'generated'" class="relative flex h-full flex-col items-center justify-center gap-4 px-6 pt-6">
-            <img v-if="logo" :src="logo" :alt="name" class="max-h-24 w-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" draggable="false">
-            <p v-else class="text-center text-xl font-black text-white drop-shadow">{{ name }}</p>
+          <div
+            v-if="mode === 'generated'"
+            class="relative flex h-full flex-col items-center justify-center gap-4 px-6 pt-6"
+          >
+            <img
+              v-if="logo"
+              :src="logo"
+              :alt="name"
+              class="max-h-24 w-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+              draggable="false"
+            />
+            <p
+              v-else
+              class="text-center text-xl font-black text-white drop-shadow"
+            >
+              {{ name }}
+            </p>
             <div class="mt-4 flex flex-col items-center gap-1">
-              <span class="rounded-full border-2 border-amber-300/90 px-3 py-1 text-xs font-black tracking-widest text-amber-300">PN</span>
-              <span class="text-[10px] font-semibold tracking-[0.3em] text-white/70 uppercase">10 cartes</span>
+              <span
+                class="rounded-full border-2 border-amber-300/90 px-3 py-1 text-xs font-black tracking-widest text-amber-300"
+                >PN</span
+              >
+              <span
+                class="text-[10px] font-semibold tracking-[0.3em] text-white/70 uppercase"
+                >10 cartes</span
+              >
             </div>
           </div>
           <span v-else class="sr-only">{{ name }}</span>
-          <div v-if="mode === 'generated'" class="booster__crimp booster__crimp--bottom" />
+          <div
+            v-if="mode === 'generated'"
+            class="booster__crimp booster__crimp--bottom"
+          />
         </div>
 
         <!-- Cut line and swipe progress -->
         <div class="booster__line">
           <div
             class="booster__cut"
-            :style="{ transform: `scaleX(${progress})`, transformOrigin: direction === 1 ? 'left' : 'right' }"
+            :style="{
+              transform: `scaleX(${progress})`,
+              transformOrigin: direction === 1 ? 'left' : 'right',
+            }"
           />
           <div v-if="!torn && !dragging" class="booster__hint" />
         </div>
@@ -176,7 +219,9 @@ watch(() => props.name, () => {
     </div>
 
     <p class="mt-8 h-5 text-sm text-zinc-400" aria-live="polite">
-      <template v-if="!torn && mode !== 'loading'">Glisse le long de la ligne pour ouvrir</template>
+      <template v-if="!torn && mode !== 'loading'"
+        >Glisse le long de la ligne pour ouvrir</template
+      >
     </p>
     <button
       v-if="!torn"
@@ -214,7 +259,11 @@ watch(() => props.name, () => {
   position: absolute;
   inset: 8%;
   border-radius: 24px;
-  background: radial-gradient(closest-side, rgb(250 204 21 / 0.35), transparent);
+  background: radial-gradient(
+    closest-side,
+    rgb(250 204 21 / 0.35),
+    transparent
+  );
   filter: blur(30px);
   transform: scale(1.4);
 }
@@ -241,7 +290,9 @@ watch(() => props.name, () => {
 
 .has-art .booster__flap,
 .has-art .booster__body {
-  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.12), transparent 40%), var(--art);
+  background-image:
+    linear-gradient(135deg, rgb(255 255 255 / 0.12), transparent 40%),
+    var(--art);
 }
 
 /* Backgrounds are sized to the whole pack so flap and body line up */
@@ -249,18 +300,30 @@ watch(() => props.name, () => {
   top: 0;
   height: calc(var(--cut-n) * 100%);
   border-radius: 6px 6px 0 0;
-  background-size: 100% 100%, 100% calc(100% / var(--cut-n));
-  background-position: 0 0, 0 0;
-  transition: transform 0.7s cubic-bezier(0.3, 0.6, 0.4, 1), opacity 0.7s ease;
+  background-size:
+    100% 100%,
+    100% calc(100% / var(--cut-n));
+  background-position:
+    0 0,
+    0 0;
+  transition:
+    transform 0.7s cubic-bezier(0.3, 0.6, 0.4, 1),
+    opacity 0.7s ease;
 }
 
 .booster__body {
   top: calc(var(--cut-n) * 100%);
   bottom: 0;
   border-radius: 0 0 6px 6px;
-  background-size: 100% 100%, 100% calc(100% / (1 - var(--cut-n)));
-  background-position: 0 0, 0 100%;
-  transition: transform 0.6s cubic-bezier(0.5, 0, 0.75, 0) 0.35s, opacity 0.5s ease 0.45s;
+  background-size:
+    100% 100%,
+    100% calc(100% / (1 - var(--cut-n)));
+  background-position:
+    0 0,
+    0 100%;
+  transition:
+    transform 0.6s cubic-bezier(0.5, 0, 0.75, 0) 0.35s,
+    opacity 0.5s ease 0.45s;
 }
 
 .has-art .booster__flap {
@@ -275,7 +338,11 @@ watch(() => props.name, () => {
   position: absolute;
   inset: 0 0 auto;
   height: 22px;
-  background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.35) 0 2px, rgb(255 255 255 / 0.08) 2px 6px);
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0.35) 0 2px,
+    rgb(255 255 255 / 0.08) 2px 6px
+  );
   mask: linear-gradient(to bottom, #000 60%, transparent);
 }
 
@@ -287,7 +354,12 @@ watch(() => props.name, () => {
 .booster__shine {
   position: absolute;
   inset: -50%;
-  background: linear-gradient(115deg, transparent 40%, rgb(255 255 255 / 0.35) 50%, transparent 60%);
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgb(255 255 255 / 0.35) 50%,
+    transparent 60%
+  );
   animation: shine 3.5s ease-in-out infinite;
   pointer-events: none;
 }
@@ -319,7 +391,9 @@ watch(() => props.name, () => {
   height: 4px;
   border-radius: 2px;
   background: #fff;
-  box-shadow: 0 0 12px 3px rgb(255 255 255 / 0.9), 0 0 30px 8px rgb(250 204 21 / 0.7);
+  box-shadow:
+    0 0 12px 3px rgb(255 255 255 / 0.9),
+    0 0 30px 8px rgb(250 204 21 / 0.7);
   transition: transform 0.08s linear;
 }
 
@@ -341,13 +415,16 @@ watch(() => props.name, () => {
 }
 
 .is-torn .booster__glow {
-  transition: transform 0.6s ease, opacity 0.6s ease 0.3s;
+  transition:
+    transform 0.6s ease,
+    opacity 0.6s ease 0.3s;
   transform: scale(2.2);
   opacity: 0;
 }
 
 .is-torn .booster__flap {
-  transform: translate(calc(var(--dir) * 60%), -160%) rotate(calc(var(--dir) * 28deg));
+  transform: translate(calc(var(--dir) * 60%), -160%)
+    rotate(calc(var(--dir) * 28deg));
   opacity: 0;
 }
 
@@ -357,7 +434,8 @@ watch(() => props.name, () => {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0) rotate(-1deg);
   }
   50% {
@@ -376,7 +454,8 @@ watch(() => props.name, () => {
   0% {
     transform: translateX(-40%);
   }
-  60%, 100% {
+  60%,
+  100% {
     transform: translateX(40%);
   }
 }

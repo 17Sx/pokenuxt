@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const request = toWebRequest(event)
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: { headers: request.headers }
+    context: { headers: request.headers },
   })
 
   if (response) return response

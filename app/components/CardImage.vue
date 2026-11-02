@@ -1,9 +1,12 @@
 <script setup lang="ts">
-const props = withDefaults(defineProps<{
-  src: string | null
-  alt: string
-  lazy?: boolean
-}>(), { lazy: true })
+const props = withDefaults(
+  defineProps<{
+    src: string | null
+    alt: string
+    lazy?: boolean
+  }>(),
+  { lazy: true },
+)
 
 const MAX_RETRIES = 2
 
@@ -17,11 +20,14 @@ const url = computed(() => {
   return attempt.value ? `${props.src}?retry=${attempt.value}` : props.src
 })
 
-watch(() => props.src, () => {
-  clearTimeout(timer)
-  attempt.value = 0
-  failed.value = false
-})
+watch(
+  () => props.src,
+  () => {
+    clearTimeout(timer)
+    attempt.value = 0
+    failed.value = false
+  },
+)
 
 const onError = () => {
   if (attempt.value >= MAX_RETRIES) {
@@ -42,7 +48,7 @@ onBeforeUnmount(() => clearTimeout(timer))
     :loading="lazy ? 'lazy' : 'eager'"
     class="aspect-[63/88] w-full rounded-lg bg-zinc-900"
     @error="onError"
-  >
+  />
   <div
     v-else
     class="flex aspect-[63/88] w-full items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-900 p-3 text-center text-xs text-zinc-500"

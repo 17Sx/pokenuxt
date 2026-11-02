@@ -14,7 +14,9 @@ const base = os.$context<Context>()
 
 // Many cards have no French scan, the English one is often available
 const imageOf = async (card: CardResumeModel, quality: Quality) => {
-  const source = card.image ? card : await tcgdexEn.card.get(card.id).catch(() => null)
+  const source = card.image
+    ? card
+    : await tcgdexEn.card.get(card.id).catch(() => null)
   return source?.image ? source.getImageURL(quality, 'webp') : null
 }
 
@@ -23,7 +25,7 @@ const toCardResume = async (card: CardResumeModel, quality: Quality) => ({
   id: card.id,
   localId: card.localId,
   name: card.name,
-  image: await imageOf(card, quality)
+  image: await imageOf(card, quality),
 })
 
 const toCard = async (card: CardModel) => ({
@@ -36,7 +38,7 @@ const toCard = async (card: CardModel) => ({
   types: card.types ?? [],
   stage: card.stage ?? null,
   description: card.description ?? null,
-  set: { id: card.set.id, name: card.set.name }
+  set: { id: card.set.id, name: card.set.name },
 })
 
 export const router = {
@@ -47,24 +49,26 @@ export const router = {
       const [types, rarities, categories] = await Promise.all([
         tcgdex.type.list(),
         tcgdex.rarity.list(),
-        tcgdex.categorie.list()
+        tcgdex.categorie.list(),
       ])
       return {
         types: types.map(String),
         rarities: rarities.map(String),
-        categories: categories.map(String)
+        categories: categories.map(String),
       }
     }),
 
     search: base
-      .input(z.object({
-        name: z.string().trim().default(''),
-        type: z.string().optional(),
-        rarity: z.string().optional(),
-        category: z.string().optional(),
-        page: z.number().int().min(1).default(1),
-        perPage: z.number().int().min(1).max(100).default(24)
-      }))
+      .input(
+        z.object({
+          name: z.string().trim().default(''),
+          type: z.string().optional(),
+          rarity: z.string().optional(),
+          category: z.string().optional(),
+          page: z.number().int().min(1).default(1),
+          perPage: z.number().int().min(1).max(100).default(24),
+        }),
+      )
       .handler(async ({ input }) => {
         const query = Query.create()
         if (input.name) query.contains('name', input.name)
@@ -74,35 +78,40 @@ export const router = {
         // No criteria would list the whole catalogue
         if (!query.params.length) return []
 
-        const cards = await tcgdex.card.list(query.paginate(input.page, input.perPage))
-        return Promise.all(cards.map(card => toCardResume(card, 'low')))
+        const cards = await tcgdex.card.list(
+          query.paginate(input.page, input.perPage),
+        )
+        return Promise.all(cards.map((card) => toCardResume(card, 'low')))
       }),
 
     get: base
       .input(z.object({ id: z.string().min(1) }))
       .handler(async ({ input }) => {
         const card = await tcgdex.card.get(input.id)
-        if (!card) throw new ORPCError('NOT_FOUND', { message: `Card ${input.id} not found` })
+        if (!card)
+          throw new ORPCError('NOT_FOUND', {
+            message: `Card ${input.id} not found`,
+          })
         return toCard(card)
-      })
+      }),
   },
 
   sets: {
     list: base.handler(async () => {
       const sets = await tcgdex.set.list()
       return sets
-        .map(set => ({
+        .map((set) => ({
           id: set.id,
           name: set.name,
           logo: set.logo ? `${set.logo}.webp` : null,
-          cardCount: set.cardCount.total
+          cardCount: set.cardCount.total,
         }))
         .reverse()
     }),
 
     packArt: base
       .input(z.object({ setId: z.string().min(1) }))
-      .handler(({ input }) => packArtFor(input.setId))
+      .handler(({ input }) => packArtFor(input.setId)),
   },
 
   packs: {
@@ -111,14 +120,19 @@ export const router = {
       .handler(async ({ input }) => {
         const pack = await openPack(input.setId)
         if (!pack?.length) {
-          throw new ORPCError('BAD_REQUEST', { message: 'Cette extension n’a pas de données de rareté exploitables' })
+          throw new ORPCError('BAD_REQUEST', {
+            message:
+              'Cette extension n’a pas de données de rareté exploitables',
+          })
         }
-        return Promise.all(pack.map(async ({ card, tier }) => ({
-          ...(await toCardResume(card, 'high')),
-          tier
-        })))
-      })
-  }
+        return Promise.all(
+          pack.map(async ({ card, tier }) => ({
+            ...(await toCardResume(card, 'high')),
+            tier,
+          })),
+        )
+      }),
+  },
 }
 
 export type Router = typeof router

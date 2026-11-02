@@ -13,7 +13,9 @@ export interface OwnedCard {
 export function useCollection() {
   const cards = useState<Record<string, OwnedCard>>('collection', () => ({}))
 
-  const add = (opened: Array<Pick<OwnedCard, 'id' | 'name' | 'image' | 'tier'>>) => {
+  const add = (
+    opened: Array<Pick<OwnedCard, 'id' | 'name' | 'image' | 'tier'>>,
+  ) => {
     const now = Date.now()
     for (const card of opened) {
       const owned = cards.value[card.id]
@@ -23,7 +25,9 @@ export function useCollection() {
   }
 
   const unique = computed(() => Object.keys(cards.value).length)
-  const total = computed(() => Object.values(cards.value).reduce((sum, card) => sum + card.count, 0))
+  const total = computed(() =>
+    Object.values(cards.value).reduce((sum, card) => sum + card.count, 0),
+  )
 
   return { cards, add, unique, total }
 }

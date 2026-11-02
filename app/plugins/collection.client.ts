@@ -10,18 +10,20 @@ export default defineNuxtPlugin(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) cards.value = JSON.parse(saved)
-    }
-    catch {
+    } catch {
       // Unavailable or corrupted storage: start from an empty collection
     }
 
-    watch(cards, (value) => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-      }
-      catch {
-        // Storage full or blocked: the collection only lives for this session
-      }
-    }, { deep: true })
+    watch(
+      cards,
+      (value) => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+        } catch {
+          // Storage full or blocked: the collection only lives for this session
+        }
+      },
+      { deep: true },
+    )
   })
 })

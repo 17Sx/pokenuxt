@@ -1,1 +1,9 @@
-export type HoloPreset = 'bursts' | 'stars' | 'shards' | 'cosmos' | 'rainbow' | 'swirl' | 'glitter' | 'gold'
+export type HoloPreset =
+  | 'bursts'
+  | 'stars'
+  | 'shards'
+  | 'cosmos'
+  | 'rainbow'
+  | 'swirl'
+  | 'glitter'
+  | 'gold'

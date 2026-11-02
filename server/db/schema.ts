@@ -4,5 +4,5 @@ import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 export const favorites = pgTable('favorites', {
   id: uuid().primaryKey().defaultRandom(),
   cardId: text().notNull(),
-  createdAt: timestamp().notNull().defaultNow()
+  createdAt: timestamp().notNull().defaultNow(),
 })

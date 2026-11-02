@@ -7,7 +7,7 @@ import type { Router } from '~~/server/orpc/router'
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent()
   const orpc: RouterClient<Router> = createRouterClient(router, {
-    context: () => ({ headers: new Headers(event?.headers) })
+    context: () => ({ headers: new Headers(event?.headers) }),
   })
 
   return { provide: { orpc } }
