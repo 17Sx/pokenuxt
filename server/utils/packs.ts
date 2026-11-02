@@ -68,13 +68,22 @@ const RARE_SLOT_WEIGHTS: Partial<Record<RarityTier, number>> = {
   secret: 3,
 }
 
-const PACK_LAYOUT = {
-  energy: 1,
-  common: 5,
-  uncommon: 3,
-  bonus: 1,
-  rareSlot: 1,
-}
+const PACK_SIZE = 10
+
+// Slots of a modern booster. Commons make up whatever the other slots leave,
+// so packs without an energy (Pocket) still hold 10 cards.
+const PACK_LAYOUT = { energy: 1, uncommon: 3, bonus: 1, rareSlot: 1 }
+
+// Order inside a real pack: energy, commons, uncommons, then rarer cards
+const TIER_RANK: Tier[] = [
+  'energy',
+  'common',
+  'uncommon',
+  'rare',
+  'holo',
+  'ultra',
+  'secret',
+]
 
 export interface PackCard {
   card: CardResumeModel
@@ -195,18 +204,24 @@ export async function openPack(setId: string): Promise<PackCard[] | null> {
   const rareTier = pickRareTier(pools)
   if (!rareTier && !lowTiers.length) return null
 
-  // Comes first, so the rare is still the last card revealed
   add('energy', PACK_LAYOUT.energy)
 
   // Sets without commons/uncommons (e.g. special collections) fill the pack from rarer tiers
   const filler = lowTiers[0] ?? rareTier!
-  add(pools.common.length ? 'common' : filler, PACK_LAYOUT.common)
   add(pools.uncommon.length ? 'uncommon' : filler, PACK_LAYOUT.uncommon)
   add(
     pools.rare.length && Math.random() < 0.5 ? 'rare' : filler,
     PACK_LAYOUT.bonus,
   )
   if (rareTier) add(rareTier, PACK_LAYOUT.rareSlot)
+  add(pools.common.length ? 'common' : filler, PACK_SIZE - pack.length)
 
-  return pack
+  // Rarity order, then set number within a rarity, so the rare is revealed last
+  return pack.sort(
+    (a, b) =>
+      TIER_RANK.indexOf(a.tier) - TIER_RANK.indexOf(b.tier) ||
+      a.card.localId.localeCompare(b.card.localId, undefined, {
+        numeric: true,
+      }),
+  )
 }
