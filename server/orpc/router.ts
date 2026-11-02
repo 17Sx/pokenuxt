@@ -2,6 +2,7 @@ import { ORPCError, os } from '@orpc/server'
 import { Query } from '@tcgdex/sdk'
 import type { CardModel, CardResumeModel, Quality } from '@tcgdex/sdk'
 import * as z from 'zod'
+import { openPack } from '../utils/packs'
 import { tcgdex, tcgdexEn } from '../utils/tcgdex'
 
 export interface Context {
@@ -81,6 +82,35 @@ export const router = {
         const card = await tcgdex.card.get(input.id)
         if (!card) throw new ORPCError('NOT_FOUND', { message: `Card ${input.id} not found` })
         return toCard(card)
+      })
+  },
+
+  sets: {
+    list: base.handler(async () => {
+      const sets = await tcgdex.set.list()
+      return sets
+        .map(set => ({
+          id: set.id,
+          name: set.name,
+          logo: set.logo ? `${set.logo}.webp` : null,
+          cardCount: set.cardCount.total
+        }))
+        .reverse()
+    })
+  },
+
+  packs: {
+    open: base
+      .input(z.object({ setId: z.string().min(1) }))
+      .handler(async ({ input }) => {
+        const pack = await openPack(input.setId)
+        if (!pack?.length) {
+          throw new ORPCError('BAD_REQUEST', { message: 'Cette extension n’a pas de données de rareté exploitables' })
+        }
+        return Promise.all(pack.map(async ({ card, tier }) => ({
+          ...(await toCardResume(card, 'high')),
+          tier
+        })))
       })
   }
 }
