@@ -2,7 +2,11 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ['app/**/*.test.ts', 'scripts/**/*.test.ts'],
+    include: [
+      'app/**/*.test.ts',
+      'scripts/**/*.test.ts',
+      'prerender/**/*.test.ts',
+    ],
     environment: 'node',
   },
 })
