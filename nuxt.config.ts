@@ -31,8 +31,9 @@ export default defineNuxtConfig({
     public: {
       // The Hono API in api/, on AWS Lambda behind API Gateway in production.
       // Pages call it straight from the browser, so its CORS lists this
-      // site's origin. Set with NUXT_PUBLIC_API_BASE.
-      apiBase: 'http://localhost:8787',
+      // site's origin. NUXT_PUBLIC_API_BASE is read at build time, which is
+      // when CI knows the API's URL, and can still override it at runtime.
+      apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'http://localhost:8787',
     },
   },
   css: ['~/assets/css/main.css'],
