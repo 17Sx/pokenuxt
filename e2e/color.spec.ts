@@ -35,10 +35,10 @@ test('le choix est retenu et rendu par le serveur', async ({ page, goto }) => {
   await expect(cardSprite(page, 'Bulbasaur')).toHaveAttribute('src', /[?&]c=1/)
 
   // The HTML from the server already asks for the coloured sprite.
-  const html = await (await page.request.get('/pokemon/1')).text()
+  const html = await (await page.request.get('/pokemon/bulbasaur')).text()
   expect(html).toContain('/api/sprite/1?s=256&amp;c=1')
 
-  await goto('/pokemon/1', { waitUntil: 'hydration' })
+  await goto('/pokemon/bulbasaur', { waitUntil: 'hydration' })
   await expect(page.getByRole('button', { name: 'Couleur' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -49,7 +49,7 @@ test('la fiche et la carte partagent le même réglage', async ({
   page,
   goto,
 }) => {
-  await goto('/pokemon/25', { waitUntil: 'hydration' })
+  await goto('/pokemon/pikachu', { waitUntil: 'hydration' })
   await page.getByRole('button', { name: 'Couleur' }).click()
   await expect(page.locator('main img').first()).toHaveAttribute(
     'src',
@@ -63,7 +63,7 @@ test('la fiche et la carte partagent le même réglage', async ({
   await page
     .getByRole('button', { name: 'Afficher Pikachu en noir et blanc' })
     .click()
-  await goto('/pokemon/25', { waitUntil: 'hydration' })
+  await goto('/pokemon/pikachu', { waitUntil: 'hydration' })
   await expect(page.getByRole('button', { name: 'N&B' })).toHaveAttribute(
     'aria-pressed',
     'true',

@@ -9,7 +9,7 @@ const label = computed(() => pokemonLabel(props.pokemon.name))
 
 <template>
   <article class="group relative">
-    <NuxtLink :to="`/pokemon/${id}`" class="block outline-none">
+    <NuxtLink :to="`/pokemon/${props.pokemon.name}`" class="block outline-none">
       <div
         class="dot-grid relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-zinc-950 transition-colors duration-500 group-hover:border-white/30 group-has-[a:focus-visible]:border-white"
       >

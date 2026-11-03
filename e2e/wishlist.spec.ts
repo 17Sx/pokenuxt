@@ -147,7 +147,7 @@ test('ouvre la fiche d’un Pokémon et l’ajoute depuis la fiche', async ({
     .first()
     .click()
 
-  await expect(page).toHaveURL(/\/pokemon\/25$/)
+  await expect(page).toHaveURL(/\/pokemon\/pikachu$/)
   await expect(
     page.getByRole('heading', { level: 1, name: 'Pikachu' }),
   ).toBeVisible()

@@ -113,7 +113,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           class="group flex items-center gap-1 rounded-lg border border-white/10 bg-zinc-950 py-1 pr-1 pl-1.5 transition-colors hover:border-white/25"
         >
           <NuxtLink
-            :to="`/pokemon/${pokemonId(p)}`"
+            :to="`/pokemon/${p.name}`"
             class="flex items-center gap-2 pr-1 text-[13px] text-zinc-200 hover:text-white"
           >
             <DitherSprite :id="pokemonId(p)" :size="96" class="size-8" />
