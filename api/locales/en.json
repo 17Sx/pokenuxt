@@ -5,6 +5,8 @@
     "not_found": "Nothing was found here.",
     "already_in_wishlist": "This Pokémon is already in the wishlist.",
     "not_in_wishlist": "This Pokémon isn’t in the wishlist.",
+    "already_liked": "This Pokémon is already liked.",
+    "not_liked": "This Pokémon isn’t liked.",
     "invalid_path": "This PokéAPI path isn’t allowed.",
     "invalid_query": "limit and offset must be numbers.",
     "pokeapi_unreachable": "PokéAPI can’t be reached right now.",

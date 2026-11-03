@@ -224,8 +224,9 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
           {{ flavor }}
         </p>
 
-        <div class="mt-7">
+        <div class="mt-7 flex flex-wrap gap-2">
           <WishlistToggle :pokemon="resource" full />
+          <LikeToggle :pokemon="resource" full />
         </div>
 
         <dl class="mt-auto grid grid-cols-3 gap-3 pt-10">

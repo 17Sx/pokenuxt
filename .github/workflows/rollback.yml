@@ -170,7 +170,11 @@ jobs:
     needs: [pick, ssg, ssr]
     runs-on: ubuntu-latest
     steps:
+      # The release's own smoke tests: an older release may lack routes the
+      # newer checks expect.
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.pick.outputs.commit }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2

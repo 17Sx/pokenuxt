@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { wishlist } = useWishlist()
+const { likes } = useLikes()
 const { t } = useI18n()
 </script>
 
@@ -48,6 +49,17 @@ const { t } = useI18n()
               class="font-doto text-[15px] leading-none font-bold tracking-[0.1em] text-white"
             >
               {{ String(wishlist.length).padStart(2, '0') }}
+            </span>
+          </NuxtLink>
+          <NuxtLink
+            to="/#likes"
+            class="hidden items-center gap-2 text-zinc-400 transition-colors hover:text-white sm:flex"
+          >
+            {{ t('nav.likes') }}
+            <span
+              class="font-doto text-[15px] leading-none font-bold tracking-[0.1em] text-white"
+            >
+              {{ String(likes.length).padStart(2, '0') }}
             </span>
           </NuxtLink>
           <LanguageSwitch />

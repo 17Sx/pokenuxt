@@ -6,13 +6,17 @@ import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
 import { pokeapiHandler } from './routes/pokeapi'
 import { spriteHandler } from './routes/sprite'
+import { likesRoutes } from './routes/likes'
 import { wishlistRoutes } from './routes/wishlist'
+import { createMemoryLikes, type Likes } from './lib/likes'
 import { createMemoryWishlist, type Wishlist } from './lib/wishlist'
 import { fail } from './i18n'
 
 export type AppOptions = {
   /** A fresh, empty one in memory by default. */
   wishlist?: Wishlist
+  /** A fresh, empty one in memory by default. */
+  likes?: Likes
   /** Used for PokéAPI and sprites. Tests pass a fake one. */
   fetch?: typeof fetch
   /** Sites whose pages may call the API from the browser. */
@@ -30,6 +34,7 @@ export function originsFromEnv(env = process.env) {
 
 export function createApp({
   wishlist = createMemoryWishlist(),
+  likes = createMemoryLikes(),
   fetch: fetcher = fetch,
   origins = originsFromEnv(),
   log = false,
@@ -48,19 +53,19 @@ export function createApp({
   )
   // Sprites are shown on the front's own domain: let other origins load them.
   app.use(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }))
-  // A wishlist entry is { name, url }: nothing bigger is ever needed.
-  app.use(
-    '/wishlist/*',
-    bodyLimit({
-      maxSize: 1024,
-      onError: (c) => fail(c, 'body_too_large', 413),
-    }),
-  )
+  // A wishlist entry or a like is { name, url }: nothing bigger is ever needed.
+  const smallBody = bodyLimit({
+    maxSize: 1024,
+    onError: (c) => fail(c, 'body_too_large', 413),
+  })
+  app.use('/wishlist/*', smallBody)
+  app.use('/likes/*', smallBody)
 
   app.get('/health', (c) => c.json({ ok: true }))
   app.get('/pokeapi/*', pokeapiHandler(fetcher))
   app.get('/sprite/:id', spriteHandler(fetcher))
   app.route('/wishlist', wishlistRoutes(wishlist))
+  app.route('/likes', likesRoutes(likes))
 
   app.notFound((c) => fail(c, 'not_found', 404))
   app.onError((error, c) => {
