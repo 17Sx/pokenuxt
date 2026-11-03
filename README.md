@@ -98,7 +98,11 @@ From `infra/`, with an AWS profile: `bun run synth`, `bun run diff`, `bun run de
 2. Store the transaction pooler URL: `aws ssm put-parameter --name /pokenuxt/database-url --type SecureString --value '<url>'`.
 3. `bun run deploy` for the API, and `bun run deploy:ci-user` for the CI user.
 
-Projects in the new AWS experience can't create OIDC providers, so GitHub Actions can't use OIDC. CI deploys as the IAM user `pokenuxt-github-deploy` (`infra/lib/ci-user-stack.ts`), which can only assume the CDK bootstrap roles. Its access key lives in GitHub's secrets; rotate it from time to time.
+Projects in the new AWS experience can't create OIDC providers, so GitHub Actions can't use OIDC. CI deploys as the IAM user `pokenuxt-github-deploy` (`infra/lib/ci-user-stack.ts`), which can only assume the CDK bootstrap roles. Its access key lives in GitHub's secrets; rotate it from time to time. This creates one and stores it in the `production` environment without printing it:
+
+```bash
+aws iam create-access-key --user-name pokenuxt-github-deploy --profile pokenuxt --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text | { read id secret; gh secret set AWS_ACCESS_KEY_ID --env production --body "$id"; gh secret set AWS_SECRET_ACCESS_KEY --env production --body "$secret"; }
+```
 
 ### Setting up GitHub and Vercel
 
