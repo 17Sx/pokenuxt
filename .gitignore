@@ -9,6 +9,14 @@ dist
 # Node dependencies
 node_modules
 
+# Vercel CLI
+.vercel
+
+# Playwright
+test-results
+playwright-report
+blob-report
+
 # Logs
 logs
 *.log
@@ -22,3 +30,6 @@ logs
 .env
 .env.*
 !.env.example
+
+# AWS CDK
+infra/cdk.out

@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource/doto/700.css';
+
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --font-doto: 'Doto', ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: #000;
+}
+
+::selection {
+  background: rgb(255 255 255 / 0.18);
+}
+
+/* Tight, quiet dotted rules, as on 17sx.me. A solid dot marks each crossing. */
+.rule-dots {
+  background-image: radial-gradient(
+    circle,
+    currentColor 0.4px,
+    transparent 0.55px
+  );
+  background-repeat: repeat;
+  color: rgb(255 255 255 / 0.14);
+}
+
+.rule-dots-x {
+  height: 2px;
+  background-size: 4px 2px;
+  background-position: center;
+}
+
+.rule-dots-y {
+  width: 2px;
+  background-size: 2px 4px;
+  background-position: center;
+}
+
+/* Faint dot grid behind the sprites. */
+.dot-grid {
+  background-image: radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.07) 0.6px,
+    transparent 0.8px
+  );
+  background-size: 8px 8px;
+  background-position: center;
+}
+
+/* A row of dots, for the stat bars. */
+.dot-bar {
+  background-image: radial-gradient(
+    circle,
+    currentColor 1.4px,
+    transparent 1.8px
+  );
+  background-size: 6px 8px;
+  background-position: left center;
+  background-repeat: repeat-x;
+}
+
+/* Sprites are dithered on the server at a low resolution: keep every dot square. */
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Sprites draw in from the top, a few rows at a time. */
+@keyframes dither-reveal {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dither-reveal {
+    animation: dither-reveal 520ms steps(10, end) both;
+  }
+}

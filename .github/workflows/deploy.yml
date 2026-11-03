@@ -1,0 +1,104 @@
+name: Deploy
+
+# Every push to main goes to production, once the front, API and database
+# workflows pass: db/ is applied to the database, the API is deployed to AWS
+# Lambda behind API Gateway, then the front to Vercel.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  # Never stop a deploy halfway; the next one waits.
+  cancel-in-progress: false
+
+env:
+  VERCEL_CLI: vercel@65.9.0
+
+jobs:
+  front-ci:
+    uses: ./.github/workflows/ci.yml
+
+  api-ci:
+    uses: ./.github/workflows/api.yml
+
+  db-ci:
+    uses: ./.github/workflows/db.yml
+
+  migrate:
+    name: Migrate the database
+    needs: [front-ci, api-ci, db-ci]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+      # Supabase's session pooler URL: GitHub's runners have no IPv6, which
+      # the direct db.<project>.supabase.co host needs.
+      - run: bun run --cwd api db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  api:
+    name: Deploy the API to AWS
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      # The pokenuxt-github-deploy user (infra/lib/ci-user-stack.ts): it can
+      # only assume the CDK bootstrap roles, which do the deploying.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      # Lambda and API Gateway, with the production front allowed by CORS.
+      - id: deploy
+        working-directory: infra
+        run: |
+          bun run deploy -- --require-approval never --outputs-file cdk.out/outputs.json -c webOrigin=${{ vars.WEB_URL }}
+          echo "url=$(jq -r '.PokenuxtApi.ApiUrl' cdk.out/outputs.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the API answers, wishlist included
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/health"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/wishlist"
+
+  web:
+    name: Deploy the front
+    needs: api
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+      # The API Gateway URL the pages call from the browser.
+      NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Check the front answers and the API lets it in
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "${{ vars.WEB_URL }}/"
+          curl --fail --silent --show-error --head --header "Origin: ${{ vars.WEB_URL }}" "$NUXT_PUBLIC_API_BASE/health" | grep -i "access-control-allow-origin: ${{ vars.WEB_URL }}"

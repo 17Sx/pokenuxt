@@ -1,0 +1,10 @@
+.nuxt
+.output
+.data
+node_modules
+bun.lock
+test-results
+playwright-report
+blob-report
+api
+infra/cdk.out

@@ -1,0 +1,107 @@
+name: API
+
+# The Hono API in api/, on its own: only its dependencies are installed, and
+# every step runs with Bun. The last job checks its AWS infrastructure.
+on:
+  pull_request:
+    paths:
+      - api/**
+      - infra/**
+      - scripts/check-i18n.mjs
+      - bun.lock
+      - .github/workflows/api.yml
+      - .github/actions/setup/**
+  push:
+    branches: [dev]
+    paths:
+      - api/**
+      - infra/**
+      - scripts/check-i18n.mjs
+      - bun.lock
+      - .github/workflows/api.yml
+      - .github/actions/setup/**
+  # Deploy runs it before deploying main.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-${{ github.workflow }}-${{ github.ref }}
+  # A new push to a pull request replaces the run in progress.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: api
+
+jobs:
+  format:
+    name: Prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+      - run: bun run format:check
+
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+      - run: bun run lint
+      - run: bun run i18n:check
+
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+      - run: bun run typecheck
+
+  test:
+    name: Vitest
+    runs-on: ubuntu-latest
+    # The Postgres tests run against this throwaway database.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+      # Vitest runs on the Bun runtime: see the test script.
+      - run: bun run test
+
+  infra:
+    name: CDK synth
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v5
+      # The API's dependencies too: synth bundles the Lambda from api/.
+      - uses: ./.github/actions/setup
+      - run: bun run typecheck
+      - run: bun run synth -- --quiet

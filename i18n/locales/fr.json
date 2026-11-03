@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "description": "Le Pokédex national en noir et blanc, point par point."
+  },
+  "nav": {
+    "label": "Navigation principale",
+    "pokedex": "Pokédex",
+    "wishlist": "Wishlist",
+    "language": "Langue"
+  },
+  "home": {
+    "title": "Tous les Pokémon.",
+    "intro": "{count} Pokémon tirés de PokéAPI. Cherche-les, ouvre leur fiche, garde tes préférés dans la wishlist.",
+    "search": "Rechercher un Pokémon",
+    "pokedex": "Pokédex",
+    "results": "{count} résultats",
+    "noResults": "Aucun Pokémon ne correspond à « {query} ».",
+    "showMore": "Afficher plus"
+  },
+  "wishlist": {
+    "title": "Wishlist",
+    "empty": "Aucun Pokémon pour l’instant. Ajoute-en avec le {plus} d’une carte.",
+    "add": "Ajouter {name} à la wishlist",
+    "remove": "Retirer {name} de la wishlist",
+    "addShort": "Ajouter à la wishlist",
+    "saved": "Dans la wishlist",
+    "failed": "La wishlist n’a pas pu être mise à jour. Réessaie dans un instant."
+  },
+  "color": {
+    "group": "Couleur de {name}",
+    "blackAndWhite": "N&B",
+    "color": "Couleur",
+    "showColor": "Afficher {name} en couleur",
+    "showBlackAndWhite": "Afficher {name} en noir et blanc"
+  },
+  "pokemon": {
+    "back": "Pokédex",
+    "neighbours": "Pokémon voisins",
+    "height": "Taille",
+    "weight": "Poids",
+    "baseExperience": "Exp. de base",
+    "stats": "Statistiques",
+    "total": "Total"
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Feu",
+    "water": "Eau",
+    "electric": "Électrik",
+    "grass": "Plante",
+    "ice": "Glace",
+    "fighting": "Combat",
+    "poison": "Poison",
+    "ground": "Sol",
+    "flying": "Vol",
+    "psychic": "Psy",
+    "bug": "Insecte",
+    "rock": "Roche",
+    "ghost": "Spectre",
+    "dragon": "Dragon",
+    "dark": "Ténèbres",
+    "steel": "Acier",
+    "fairy": "Fée",
+    "stellar": "Stellaire"
+  },
+  "stats": {
+    "hp": "PV",
+    "attack": "Attaque",
+    "defense": "Défense",
+    "special-attack": "Atq. Spé.",
+    "special-defense": "Déf. Spé.",
+    "speed": "Vitesse"
+  },
+  "error": {
+    "notFound": "Ce Pokémon s’est échappé. Il n’est pas dans le Pokédex.",
+    "generic": "Quelque chose a planté. Réessaie dans un instant.",
+    "back": "Retour au Pokédex"
+  }
+}
