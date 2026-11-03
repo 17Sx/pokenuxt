@@ -18,19 +18,25 @@ export function removePokemon(list: Pokemon[], id: number): boolean {
   return true
 }
 
-/**
- * The wishlist: one array in memory, shared by every visitor. It is emptied
- * when the server restarts, and each server instance has its own.
- */
-export function createWishlist() {
+export type WishlistItem = Pokemon & { id: number }
+
+/** Where the wishlist is kept: Postgres in production, memory otherwise. */
+export interface Wishlist {
+  list(): Promise<WishlistItem[]>
+  /** False when the Pokémon is already in the wishlist. */
+  add(pokemon: Pokemon): Promise<boolean>
+  /** False when the Pokémon wasn't in the wishlist. */
+  remove(id: number): Promise<boolean>
+}
+
+/** One array in memory, emptied when the server restarts. */
+export function createMemoryWishlist(): Wishlist {
   const items: Pokemon[] = []
 
   return {
-    list: () =>
+    list: async () =>
       items.map((pokemon) => ({ id: pokemonId(pokemon), ...pokemon })),
-    add: (pokemon: Pokemon) => addPokemon(items, pokemon),
-    remove: (id: number) => removePokemon(items, id),
+    add: async (pokemon) => addPokemon(items, pokemon),
+    remove: async (id) => removePokemon(items, id),
   }
 }
-
-export type Wishlist = ReturnType<typeof createWishlist>

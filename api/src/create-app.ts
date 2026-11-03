@@ -6,10 +6,10 @@ import { secureHeaders } from 'hono/secure-headers'
 import { pokeapiHandler } from './routes/pokeapi'
 import { spriteHandler } from './routes/sprite'
 import { wishlistRoutes } from './routes/wishlist'
-import { createWishlist, type Wishlist } from './lib/wishlist'
+import { createMemoryWishlist, type Wishlist } from './lib/wishlist'
 
 export type AppOptions = {
-  /** A fresh, empty one by default. */
+  /** A fresh, empty one in memory by default. */
   wishlist?: Wishlist
   /** Used for PokéAPI and sprites. Tests pass a fake one. */
   fetch?: typeof fetch
@@ -17,7 +17,7 @@ export type AppOptions = {
 }
 
 export function createApp({
-  wishlist = createWishlist(),
+  wishlist = createMemoryWishlist(),
   fetch: fetcher = fetch,
   log = false,
 }: AppOptions = {}) {

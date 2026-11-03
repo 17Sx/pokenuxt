@@ -1,0 +1,60 @@
+name: Database
+
+# Checks that db/ applies to an empty Postgres. Deploy then applies it to the
+# production database before deploying the API.
+on:
+  pull_request:
+    paths:
+      - db/**
+      - api/src/db.ts
+      - api/src/migrate.ts
+      - api/src/migrations.ts
+      - .github/workflows/db.yml
+  push:
+    branches: [dev]
+    paths:
+      - db/**
+      - api/src/db.ts
+      - api/src/migrate.ts
+      - api/src/migrations.ts
+      - .github/workflows/db.yml
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Apply db/ to an empty Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+
+      - run: bun run db:migrate
+
+      - name: Apply again, nothing should run twice
+        run: bun run db:migrate | tee migrate.log && grep -q 'Nothing to apply' migrate.log

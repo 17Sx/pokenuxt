@@ -17,16 +17,16 @@ const idSchema = z.object({ id: z.string().regex(/^\d{1,6}$/) })
  */
 export function wishlistRoutes(wishlist: Wishlist) {
   return new Hono()
-    .get('/', (c) => c.json({ items: wishlist.list() }))
-    .post('/', zValidator('json', pokemonSchema, invalid), (c) => {
+    .get('/', async (c) => c.json({ items: await wishlist.list() }))
+    .post('/', zValidator('json', pokemonSchema, invalid), async (c) => {
       const pokemon = c.req.valid('json')
-      if (!wishlist.add(pokemon)) {
+      if (!(await wishlist.add(pokemon))) {
         return c.json({ error: 'already_in_wishlist' }, 409)
       }
       return c.json({ item: { id: pokemonId(pokemon), ...pokemon } }, 201)
     })
-    .delete('/:id', zValidator('param', idSchema, invalid), (c) => {
-      if (!wishlist.remove(Number(c.req.valid('param').id))) {
+    .delete('/:id', zValidator('param', idSchema, invalid), async (c) => {
+      if (!(await wishlist.remove(Number(c.req.valid('param').id)))) {
         return c.json({ error: 'not_in_wishlist' }, 404)
       }
       return c.body(null, 204)

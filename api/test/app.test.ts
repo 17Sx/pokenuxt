@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../src/create-app'
+import { wishlistFromEnv } from '../src/wishlist-from-env'
 
 describe('app', () => {
   const app = createApp()
@@ -34,5 +35,13 @@ describe('app', () => {
 
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'not_found' })
+  })
+})
+
+describe('wishlistFromEnv', () => {
+  it('refuse de démarrer en production sans DATABASE_URL', () => {
+    expect(() => wishlistFromEnv({ NODE_ENV: 'production' })).toThrow(
+      'DATABASE_URL is required in production',
+    )
   })
 })
