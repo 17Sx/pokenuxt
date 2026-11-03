@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "description": "The national Pokédex in black and white, dot by dot."
+  },
+  "nav": {
+    "label": "Main navigation",
+    "pokedex": "Pokédex",
+    "wishlist": "Wishlist",
+    "language": "Language"
+  },
+  "home": {
+    "title": "Every Pokémon.",
+    "intro": "{count} Pokémon from PokéAPI. Look them up, open their page, keep your favourites in the wishlist.",
+    "search": "Search for a Pokémon",
+    "pokedex": "Pokédex",
+    "results": "{count} results",
+    "noResults": "No Pokémon matches “{query}”.",
+    "showMore": "Show more"
+  },
+  "wishlist": {
+    "title": "Wishlist",
+    "empty": "No Pokémon yet. Add some with the {plus} on a card.",
+    "add": "Add {name} to the wishlist",
+    "remove": "Remove {name} from the wishlist",
+    "addShort": "Add to the wishlist",
+    "saved": "In the wishlist",
+    "failed": "The wishlist couldn’t be updated. Try again in a moment."
+  },
+  "color": {
+    "group": "Colour of {name}",
+    "blackAndWhite": "B&W",
+    "color": "Colour",
+    "showColor": "Show {name} in colour",
+    "showBlackAndWhite": "Show {name} in black and white"
+  },
+  "pokemon": {
+    "back": "Pokédex",
+    "neighbours": "Neighbouring Pokémon",
+    "height": "Height",
+    "weight": "Weight",
+    "baseExperience": "Base exp.",
+    "stats": "Stats",
+    "total": "Total"
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Fire",
+    "water": "Water",
+    "electric": "Electric",
+    "grass": "Grass",
+    "ice": "Ice",
+    "fighting": "Fighting",
+    "poison": "Poison",
+    "ground": "Ground",
+    "flying": "Flying",
+    "psychic": "Psychic",
+    "bug": "Bug",
+    "rock": "Rock",
+    "ghost": "Ghost",
+    "dragon": "Dragon",
+    "dark": "Dark",
+    "steel": "Steel",
+    "fairy": "Fairy",
+    "stellar": "Stellar"
+  },
+  "stats": {
+    "hp": "HP",
+    "attack": "Attack",
+    "defense": "Defense",
+    "special-attack": "Sp. Atk",
+    "special-defense": "Sp. Def",
+    "speed": "Speed"
+  },
+  "error": {
+    "notFound": "This Pokémon got away. It isn’t in the Pokédex.",
+    "generic": "Something broke. Try again in a moment.",
+    "back": "Back to the Pokédex"
+  }
+}

@@ -5,14 +5,15 @@ const props = withDefaults(
 )
 
 const { isColored, setColored } = useSpriteColor()
+const { t } = useI18n()
 
 const color = computed(() => isColored(props.id))
 const label = computed(() => pokemonLabel(props.name))
 
-const options = [
-  { label: 'N&B', value: false },
-  { label: 'Couleur', value: true },
-]
+const options = computed(() => [
+  { label: t('color.blackAndWhite'), value: false },
+  { label: t('color.color'), value: true },
+])
 
 // Four dots for the compact button: grey in black and white, coloured otherwise.
 const dots = [
@@ -30,8 +31,8 @@ const dots = [
     :aria-pressed="color"
     :aria-label="
       color
-        ? `Afficher ${label} en noir et blanc`
-        : `Afficher ${label} en couleur`
+        ? t('color.showBlackAndWhite', { name: label })
+        : t('color.showColor', { name: label })
     "
     class="inline-flex size-7 shrink-0 items-center justify-center rounded-md border backdrop-blur transition-colors duration-300"
     :class="
@@ -56,12 +57,12 @@ const dots = [
   <div
     v-else
     role="group"
-    :aria-label="`Couleur de ${label}`"
+    :aria-label="t('color.group', { name: label })"
     class="flex items-center rounded-md border border-white/10 bg-black/70 p-0.5 font-mono text-[10px] tracking-[0.16em] uppercase backdrop-blur"
   >
     <button
       v-for="option in options"
-      :key="option.label"
+      :key="String(option.value)"
       type="button"
       :aria-pressed="color === option.value"
       class="rounded px-2 py-1 uppercase transition-colors"

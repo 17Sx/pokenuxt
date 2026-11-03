@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { wishlist } = useWishlist()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -29,26 +30,27 @@ const { wishlist } = useWishlist()
           POKÉNUXT
         </NuxtLink>
         <nav
-          aria-label="Navigation principale"
+          :aria-label="t('nav.label')"
           class="flex items-center gap-5 font-mono text-[11px] tracking-[0.18em] uppercase"
         >
           <NuxtLink
             to="/#pokedex"
-            class="text-zinc-400 transition-colors hover:text-white"
+            class="hidden text-zinc-400 transition-colors hover:text-white sm:inline"
           >
-            Pokédex
+            {{ t('nav.pokedex') }}
           </NuxtLink>
           <NuxtLink
             to="/#wishlist"
             class="flex items-center gap-2 text-zinc-400 transition-colors hover:text-white"
           >
-            Wishlist
+            {{ t('nav.wishlist') }}
             <span
               class="font-doto text-[15px] leading-none font-bold tracking-[0.1em] text-white"
             >
               {{ String(wishlist.length).padStart(2, '0') }}
             </span>
           </NuxtLink>
+          <LanguageSwitch />
         </nav>
         <div
           aria-hidden="true"

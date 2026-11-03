@@ -15,6 +15,9 @@ export default defineConfig<ConfigOptions>({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     trace: 'on-first-retry',
+    // The site follows the browser's language on a first visit: the tests
+    // read French, the default, unless they ask for another one.
+    locale: 'fr-FR',
     nuxt: {
       rootDir: fileURLToPath(new URL('.', import.meta.url)),
     },

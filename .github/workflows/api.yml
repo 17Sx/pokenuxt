@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - api/**
+      - scripts/check-i18n.mjs
       - bun.lock
       - .github/workflows/api.yml
       - .github/actions/setup/**
@@ -13,6 +14,7 @@ on:
     branches: [dev]
     paths:
       - api/**
+      - scripts/check-i18n.mjs
       - bun.lock
       - .github/workflows/api.yml
       - .github/actions/setup/**
@@ -51,6 +53,7 @@ jobs:
         with:
           workspace: pokenuxt-api
       - run: bun run lint
+      - run: bun run i18n:check
 
   typecheck:
     name: Type check

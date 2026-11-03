@@ -56,7 +56,7 @@ describe('POST /wishlist', () => {
     const second = await app.request('/wishlist', post(pikachu))
 
     expect(second.status).toBe(409)
-    expect(await second.json()).toEqual({ error: 'already_in_wishlist' })
+    expect(await second.json()).toMatchObject({ error: 'already_in_wishlist' })
     expect((await list()).items).toHaveLength(1)
   })
 
@@ -89,7 +89,7 @@ describe('POST /wishlist', () => {
     })
 
     expect(response.status).toBe(400)
-    expect(await response.json()).toEqual({ error: 'invalid_request' })
+    expect(await response.json()).toMatchObject({ error: 'invalid_request' })
     expect(await list()).toEqual({ items: [] })
   })
 
@@ -108,7 +108,7 @@ describe('POST /wishlist', () => {
     const response = await app.request('/wishlist', post(body))
 
     expect(response.status).toBe(400)
-    expect(await response.json()).toEqual({ error: 'invalid_request' })
+    expect(await response.json()).toMatchObject({ error: 'invalid_request' })
   })
 })
 
@@ -129,7 +129,7 @@ describe('DELETE /wishlist/:id', () => {
     const response = await app.request('/wishlist/150', { method: 'DELETE' })
 
     expect(response.status).toBe(404)
-    expect(await response.json()).toEqual({ error: 'not_in_wishlist' })
+    expect(await response.json()).toMatchObject({ error: 'not_in_wishlist' })
     expect((await list()).items).toHaveLength(1)
   })
 

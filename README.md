@@ -20,18 +20,19 @@ The API runs on http://localhost:8787 and the front on http://localhost:3000.
 
 ## Scripts
 
-| Script              |                                           |
-| ------------------- | ----------------------------------------- |
-| `bun run dev`       | Front dev server on http://localhost:3000 |
-| `bun run dev:api`   | API dev server on http://localhost:8787   |
-| `bun run build`     | Front production build                    |
-| `bun run typecheck` | Front type check (`typecheck:api` for it) |
-| `bun run lint`      | Front ESLint (`lint:fix` to autofix)      |
-| `bun run format`    | Prettier (`format:check` in CI)           |
-| `bun run test`      | Front unit tests (`test:watch`)           |
-| `bun run test:api`  | API tests                                 |
-| `bun run test:e2e`  | Playwright, with the API started for you  |
-| `bun run banner`    | Re-dither the home page banner            |
+| Script               |                                           |
+| -------------------- | ----------------------------------------- |
+| `bun run dev`        | Front dev server on http://localhost:3000 |
+| `bun run dev:api`    | API dev server on http://localhost:8787   |
+| `bun run build`      | Front production build                    |
+| `bun run typecheck`  | Front type check (`typecheck:api` for it) |
+| `bun run lint`       | Front ESLint (`lint:fix` to autofix)      |
+| `bun run format`     | Prettier (`format:check` in CI)           |
+| `bun run i18n:check` | Locale files against `en.json`            |
+| `bun run test`       | Front unit tests (`test:watch`)           |
+| `bun run test:api`   | API tests                                 |
+| `bun run test:e2e`   | Playwright, with the API started for you  |
+| `bun run banner`     | Re-dither the home page banner            |
 
 ## API
 
@@ -61,6 +62,15 @@ const { data } = await usePokeApi<Pokemon>('pokemon/pikachu')
 `api/src/lib/dither.ts` crops the official artwork to the Pokémon, scales it down, sharpens the edges and applies Atkinson dithering: white dots on transparent. With `c=1`, each dot takes the artwork's colour instead. Each card and each Pokémon page can switch its own Pokémon to colour; the choice is kept in the `pokenuxt-colors` cookie, so the server renders the right sprite.
 
 The home page banner uses the same dithering, inverted so the outlines become white lines: `bun run banner` turns `scripts/banner-source.png` into `public/banner.png`.
+
+## i18n
+
+The site speaks English and French, with French as the default. A first visit follows the browser's language, and the choice made with the EN / FR switch is kept in the `pokenuxt-lang` cookie. URLs don't change with the language.
+
+- **Front**: [`@nuxtjs/i18n`](https://i18n.nuxtjs.org), texts in `i18n/locales/`. Pokémon names, categories and descriptions come from PokéAPI in the site's language.
+- **API**: each error has a code and a `message` in the language of the request's `Accept-Language`, from `api/locales/`. The front sends its own language.
+
+`en.json` is the reference. `bun run i18n:check` (`node scripts/check-i18n.mjs`) compares every other `.json` in `i18n/locales/` and `api/locales/` with it. It reports missing keys, keys that aren't in `en.json`, wrong types, empty texts and `{placeholders}` that differ, and exits with 1 when there is any. Pass folders to check only those: `node scripts/check-i18n.mjs api/locales`. Both CI workflows run it.
 
 ## CI/CD
 

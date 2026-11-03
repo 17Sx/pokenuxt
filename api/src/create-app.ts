@@ -7,6 +7,7 @@ import { pokeapiHandler } from './routes/pokeapi'
 import { spriteHandler } from './routes/sprite'
 import { wishlistRoutes } from './routes/wishlist'
 import { createMemoryWishlist, type Wishlist } from './lib/wishlist'
+import { fail } from './i18n'
 
 export type AppOptions = {
   /** A fresh, empty one in memory by default. */
@@ -29,7 +30,7 @@ export function createApp({
     '/wishlist/*',
     bodyLimit({
       maxSize: 1024,
-      onError: (c) => c.json({ error: 'body_too_large' }, 413),
+      onError: (c) => fail(c, 'body_too_large', 413),
     }),
   )
 
@@ -38,17 +39,18 @@ export function createApp({
   app.get('/sprite/:id', spriteHandler(fetcher))
   app.route('/wishlist', wishlistRoutes(wishlist))
 
-  app.notFound((c) => c.json({ error: 'not_found' }, 404))
+  app.notFound((c) => fail(c, 'not_found', 404))
   app.onError((error, c) => {
     // Malformed JSON bodies end up here, as a 400 from the validator.
     if (error instanceof HTTPException) {
-      return c.json(
-        { error: error.status === 400 ? 'invalid_request' : error.message },
+      return fail(
+        c,
+        error.status === 400 ? 'invalid_request' : 'request_failed',
         error.status,
       )
     }
     console.error(error)
-    return c.json({ error: 'internal_error' }, 500)
+    return fail(c, 'internal_error', 500)
   })
 
   return app

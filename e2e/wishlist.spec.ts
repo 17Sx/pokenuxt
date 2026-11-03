@@ -112,6 +112,9 @@ test('remet la liste comme avant quand l’API refuse l’ajout', async ({
       .locator('#pokedex')
       .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' }),
   ).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('alert')).toHaveText(
+    'La wishlist n’a pas pu être mise à jour. Réessaie dans un instant.',
+  )
 })
 
 test('la wishlist est la même pour tous les visiteurs', async ({

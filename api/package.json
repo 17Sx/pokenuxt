@@ -9,6 +9,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "i18n:check": "node ../scripts/check-i18n.mjs locales",
     "typecheck": "tsc --noEmit",
     "test": "bun --bun vitest run",
     "test:watch": "bun --bun vitest",
