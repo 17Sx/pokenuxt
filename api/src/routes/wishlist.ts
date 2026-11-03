@@ -1,16 +1,9 @@
 import { zValidator } from '@hono/zod-validator'
-import { Hono, type Context } from 'hono'
-import { z } from 'zod'
+import { Hono } from 'hono'
 import { pokemonId, pokemonSchema } from '../lib/pokemon'
 import type { Wishlist } from '../lib/wishlist'
 import { fail } from '../i18n'
-
-// Any request that doesn't match the schema gets the same answer.
-function invalid(result: { success: boolean }, c: Context) {
-  if (!result.success) return fail(c, 'invalid_request', 400)
-}
-
-const idSchema = z.object({ id: z.string().regex(/^\d{1,6}$/) })
+import { idSchema, invalid } from './validation'
 
 /**
  * GET / · POST / { name, url } · DELETE /:id, where id is the Pokémon's

@@ -5,6 +5,7 @@ const PAGE_SIZE = 48
 
 const { data } = await usePokeApi<NamedAPIResourceList>('pokemon?limit=1351')
 const { wishlist, removePokemon, error } = useWishlist()
+const { likes, unlike, error: likesError } = useLikes()
 const { t } = useI18n()
 const { search } = useSearch()
 
@@ -106,39 +107,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           {{ String(wishlist.length).padStart(2, '0') }}
         </span>
       </template>
-      <ul v-if="wishlist.length" class="flex flex-wrap gap-2">
-        <li
-          v-for="p in wishlist"
-          :key="p.name"
-          class="group flex items-center gap-1 rounded-lg border border-white/10 bg-zinc-950 py-1 pr-1 pl-1.5 transition-colors hover:border-white/25"
-        >
-          <NuxtLink
-            :to="`/pokemon/${p.name}`"
-            class="flex items-center gap-2 pr-1 text-[13px] text-zinc-200 hover:text-white"
-          >
-            <DitherSprite :id="pokemonId(p)" :size="96" class="size-8" />
-            {{ pokemonLabel(p.name) }}
-          </NuxtLink>
-          <button
-            type="button"
-            :aria-label="t('wishlist.remove', { name: pokemonLabel(p.name) })"
-            class="flex size-6 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-white/10 hover:text-white"
-            @click="removePokemon(p)"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              class="size-3"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="square"
-            >
-              <path d="m4 4 8 8M12 4l-8 8" />
-            </svg>
-          </button>
-        </li>
-      </ul>
+      <PokemonChips
+        v-if="wishlist.length"
+        :pokemon="wishlist"
+        :remove-label="(name) => t('wishlist.remove', { name })"
+        @remove="removePokemon"
+      />
       <i18n-t
         v-else
         keypath="wishlist.empty"
@@ -152,6 +126,36 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </i18n-t>
       <p v-if="error" role="alert" class="mt-4 text-[13px] text-zinc-300">
         {{ error }}
+      </p>
+    </DotSection>
+
+    <DotSection id="likes" :title="t('likes.title')" class="scroll-mt-16">
+      <template #meta>
+        <span
+          class="font-doto text-[22px] leading-none font-bold tracking-[0.12em] text-zinc-50"
+        >
+          {{ String(likes.length).padStart(2, '0') }}
+        </span>
+      </template>
+      <PokemonChips
+        v-if="likes.length"
+        :pokemon="likes"
+        :remove-label="(name) => t('likes.unlike', { name })"
+        @remove="unlike"
+      />
+      <i18n-t
+        v-else
+        keypath="likes.empty"
+        tag="p"
+        scope="global"
+        class="text-[14px] text-zinc-500"
+      >
+        <template #heart>
+          <span class="font-mono text-zinc-300">♥</span>
+        </template>
+      </i18n-t>
+      <p v-if="likesError" role="alert" class="mt-4 text-[13px] text-zinc-300">
+        {{ likesError }}
       </p>
     </DotSection>
 

@@ -1,7 +1,7 @@
 name: Deploy
 
 # Every push to main goes to production, once the front, API and database
-# workflows pass: db/ is applied to the database, CDK deploys the API (Lambda
+# workflows pass: db/migrations/ is applied to the database, CDK deploys the API (Lambda
 # behind API Gateway) and the front's S3 bucket and CloudFront distribution,
 # then the front is published twice: generated (SSG) to S3 and CloudFront,
 # and server-rendered (SSR) to Vercel. Smoke tests check the live release,

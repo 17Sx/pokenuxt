@@ -31,6 +31,7 @@ const label = computed(() => pokemonLabel(props.pokemon.name))
     </NuxtLink>
     <div class="absolute top-2 right-2 flex gap-1.5">
       <ColorToggle :id="id" :name="props.pokemon.name" compact />
+      <LikeToggle :pokemon="props.pokemon" />
       <WishlistToggle :pokemon="props.pokemon" />
     </div>
   </article>

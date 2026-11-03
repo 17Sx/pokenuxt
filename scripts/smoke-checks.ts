@@ -156,6 +156,7 @@ export function checksFor({ api, ssr, ssg, version }: Sites): Check[] {
         contains: ['"name":"pikachu"'],
       },
       { name: 'API wishlist', url: `${api}/wishlist`, status: 200 },
+      { name: 'API likes', url: `${api}/likes`, status: 200 },
       { name: 'API unknown route', url: `${api}/nope`, status: 404 },
     )
     for (const site of [ssr, ssg].filter(Boolean).map((s) => base(s!))) {
