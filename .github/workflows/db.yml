@@ -1,6 +1,6 @@
 name: Database
 
-# Checks that db/ applies to an empty Postgres. Deploy then applies it to the
+# Checks that db/migrations/ applies to an empty Postgres. Deploy then applies it to the
 # production database before deploying the API.
 on:
   pull_request:
@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   check:
-    name: Apply db/ to an empty Postgres
+    name: Apply db/migrations/ to an empty Postgres
     runs-on: ubuntu-latest
     services:
       postgres:

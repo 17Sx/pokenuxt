@@ -3,7 +3,7 @@ import type { Pokemon } from './lib/pokemon'
 import { pokemonId } from './lib/pokemon'
 import type { Wishlist, WishlistItem } from './lib/wishlist'
 
-/** The wishlist in the wishlist_items table, from db/init.sql. */
+/** The wishlist in the wishlist_items table, from db/migrations/000_init.sql. */
 export function createPostgresWishlist(sql: Sql): Wishlist {
   return {
     async list() {
