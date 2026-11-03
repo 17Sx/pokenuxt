@@ -1,0 +1,92 @@
+name: Deploy
+
+# Every push to main goes to production, once the front, API and database
+# workflows pass: db/ is applied to the database, then the API and the front
+# are deployed to Vercel.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  # Never stop a deploy halfway; the next one waits.
+  cancel-in-progress: false
+
+env:
+  VERCEL_CLI: vercel@65.9.0
+
+jobs:
+  front-ci:
+    uses: ./.github/workflows/ci.yml
+
+  api-ci:
+    uses: ./.github/workflows/api.yml
+
+  db-ci:
+    uses: ./.github/workflows/db.yml
+
+  migrate:
+    name: Migrate the database
+    needs: [front-ci, api-ci, db-ci]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          workspace: pokenuxt-api
+      # Supabase's session pooler URL: GitHub's runners have no IPv6, which
+      # the direct db.<project>.supabase.co host needs.
+      - run: bun run --cwd api db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  api:
+    name: Deploy the API
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.API_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_API_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Check the API answers
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ vars.API_URL }}/health"
+
+  web:
+    name: Deploy the front
+    needs: api
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+      # Read by nuxt.config.ts at build time: where /api is relayed.
+      API_URL: ${{ vars.API_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Check the front answers and reaches the API
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "${{ vars.WEB_URL }}/"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ vars.WEB_URL }}/api/health"

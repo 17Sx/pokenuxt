@@ -4,7 +4,7 @@ const { wishlist } = useWishlist()
 
 <template>
   <div
-    class="relative min-h-screen overflow-x-hidden bg-black text-zinc-100 antialiased"
+    class="relative min-h-screen overflow-x-clip bg-black text-zinc-100 antialiased"
   >
     <div
       aria-hidden="true"

@@ -1,6 +1,12 @@
 import { expect, test } from '@nuxt/test-utils/playwright'
 
-test.beforeEach(async ({ goto }) => {
+// The wishlist is one array in the API, shared by every visitor: each test
+// starts by emptying it, through the API like the front does.
+test.beforeEach(async ({ request, goto }) => {
+  const { items } = await (await request.get('/api/wishlist')).json()
+  for (const { id } of items as { id: number }[]) {
+    await request.delete(`/api/wishlist/${id}`)
+  }
   await goto('/', { waitUntil: 'hydration' })
 })
 
@@ -83,42 +89,53 @@ test('garde la wishlist après un rechargement', async ({ page, goto }) => {
   ).toBeVisible()
 })
 
-for (const [label, value] of [
-  ['du JSON invalide', '[{"name":"pikachu",'],
-  ['du JSON qui n’est pas une liste', '{"name":"pikachu"}'],
-]) {
-  test(`ne plante pas avec ${label} dans le stockage`, async ({
-    page,
-    goto,
-  }) => {
-    await page.addInitScript(
-      (stored) => localStorage.setItem('pokenuxt-wishlist', stored),
-      value,
-    )
-    await goto('/', { waitUntil: 'hydration' })
+test('remet la liste comme avant quand l’API refuse l’ajout', async ({
+  page,
+}) => {
+  await page.route('**/api/wishlist', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({ status: 500, json: { error: 'internal_error' } })
+      : route.fallback(),
+  )
 
-    const wishlist = page.locator('#wishlist')
-    await expect(
-      wishlist.getByText('Aucun Pokémon pour l’instant.'),
-    ).toBeVisible()
+  await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
+  await page
+    .locator('#pokedex')
+    .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' })
+    .click()
 
-    // The wishlist still works, and what it saves is valid again.
-    await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
-    await page
+  await expect(
+    page.locator('#wishlist').getByText('Aucun Pokémon pour l’instant.'),
+  ).toBeVisible()
+  await expect(
+    page
       .locator('#pokedex')
-      .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' })
-      .click()
-    await expect(
-      wishlist.getByRole('link', { name: 'Bulbasaur' }),
-    ).toBeVisible()
-    const saved = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('pokenuxt-wishlist')!),
-    )
-    expect(saved).toEqual([
-      { name: 'bulbasaur', url: 'https://pokeapi.co/api/v2/pokemon/1/' },
-    ])
-  })
-}
+      .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' }),
+  ).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('la wishlist est la même pour tous les visiteurs', async ({
+  page,
+  browser,
+}) => {
+  await page.getByPlaceholder('Rechercher un Pokémon').fill('bulbasaur')
+  await page
+    .locator('#pokedex')
+    .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' })
+    .click()
+  await expect(
+    page.locator('#wishlist').getByRole('link', { name: 'Bulbasaur' }),
+  ).toBeVisible()
+
+  // Another browser, with no cookies in common, sees the same list.
+  const other = await browser.newContext()
+  const otherPage = await other.newPage()
+  await otherPage.goto(page.url())
+  await expect(
+    otherPage.locator('#wishlist').getByRole('link', { name: 'Bulbasaur' }),
+  ).toBeVisible()
+  await other.close()
+})
 
 test('ouvre la fiche d’un Pokémon et l’ajoute depuis la fiche', async ({
   page,
@@ -130,7 +147,7 @@ test('ouvre la fiche d’un Pokémon et l’ajoute depuis la fiche', async ({
     .first()
     .click()
 
-  await expect(page).toHaveURL(/\/pokemon\/25$/)
+  await expect(page).toHaveURL(/\/pokemon\/pikachu$/)
   await expect(
     page.getByRole('heading', { level: 1, name: 'Pikachu' }),
   ).toBeVisible()

@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import type { Pokemon, PokemonSpecies } from 'pokenode-ts'
+import type { NamedAPIResourceList, Pokemon, PokemonSpecies } from 'pokenode-ts'
 
 const STAT_MAX = 255
 
 const route = useRoute()
-const id = Number(route.params.id)
-if (!Number.isInteger(id) || id < 1) {
+const slug = String(route.params.name)
+if (!/^[a-z0-9-]{1,100}$/i.test(slug)) {
   throw createError({ statusCode: 404, statusMessage: 'Pokémon introuvable' })
 }
 
-const { data: pokemon } = await usePokeApi<Pokemon>(`pokemon/${id}`)
+const { data: pokemon } = await usePokeApi<Pokemon>(
+  `pokemon/${slug.toLowerCase()}`,
+)
 if (!pokemon.value) {
   throw createError({ statusCode: 404, statusMessage: 'Pokémon introuvable' })
 }
+
+// /pokemon/25 and /pokemon/Pikachu both lead to /pokemon/pikachu.
+if (slug !== pokemon.value.name) {
+  await navigateTo(`/pokemon/${pokemon.value.name}`, {
+    redirectCode: 301,
+    replace: true,
+  })
+}
+
+const id = pokemon.value.id
 
 const { data: species } = await usePokeApi<PokemonSpecies>(
   `pokemon-species/${pokemon.value.species.name}`,
@@ -63,8 +75,18 @@ const stats = computed(() =>
 )
 const total = computed(() => stats.value.reduce((sum, s) => sum + s.value, 0))
 
-const previous = id > 1 && id <= LAST_NATIONAL_ID ? id - 1 : null
-const next = id < LAST_NATIONAL_ID ? id + 1 : null
+// The Pokémon just before and after in the national Pokédex. Forms have none.
+const { data: around } = await usePokeApi<NamedAPIResourceList>(
+  id <= LAST_NATIONAL_ID
+    ? `pokemon?offset=${Math.max(0, id - 2)}&limit=3`
+    : 'pokemon?limit=0',
+)
+const neighbour = (number: number) =>
+  number >= 1 && number <= LAST_NATIONAL_ID
+    ? around.value?.results.find((p) => pokemonId(p) === number)
+    : undefined
+const previous = computed(() => neighbour(id - 1))
+const next = computed(() => neighbour(id + 1))
 
 useHead({ title: () => `${name.value} — PokéNuxt` })
 </script>
@@ -88,6 +110,11 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
           >
             #{{ dexNumber(id) }}
           </span>
+          <ColorToggle
+            :id="id"
+            :name="pokemon.name"
+            class="absolute top-3.5 right-4 z-10"
+          />
           <DitherSprite
             :id="id"
             :size="256"
@@ -101,18 +128,18 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
         >
           <NuxtLink
             v-if="previous"
-            :to="`/pokemon/${previous}`"
+            :to="`/pokemon/${previous.name}`"
             class="transition-colors hover:text-white"
           >
-            ← #{{ dexNumber(previous) }}
+            ← #{{ dexNumber(id - 1) }} {{ pokemonLabel(previous.name) }}
           </NuxtLink>
           <span v-else />
           <NuxtLink
             v-if="next"
-            :to="`/pokemon/${next}`"
+            :to="`/pokemon/${next.name}`"
             class="transition-colors hover:text-white"
           >
-            #{{ dexNumber(next) }} →
+            {{ pokemonLabel(next.name) }} #{{ dexNumber(id + 1) }} →
           </NuxtLink>
         </nav>
       </div>

@@ -55,8 +55,8 @@ function opaqueBounds({ width, height, data }: PNG): Bounds {
 }
 
 // Scales the bounds of the source down to width × height by averaging each
-// block of pixels, and returns a lightness from 0 to 1 per pixel, or -1 where
-// the pixel is transparent.
+// block of pixels. Returns a lightness from 0 to 1 per pixel, or -1 where the
+// pixel is transparent, and the average colour of each pixel.
 function lightness(
   source: PNG,
   bounds: Bounds,
@@ -67,6 +67,7 @@ function lightness(
   const stepX = bounds.width / width
   const stepY = bounds.height / height
   const values = new Float32Array(width * height).fill(-1)
+  const colors = new Uint8Array(width * height * 3)
 
   for (let y = 0; y < height; y++) {
     const y0 = Math.floor(bounds.y + y * stepY)
@@ -76,6 +77,9 @@ function lightness(
       const x1 = Math.max(x0 + 1, Math.floor(bounds.x + (x + 1) * stepX))
       let alpha = 0
       let light = 0
+      let red = 0
+      let green = 0
+      let blue = 0
       for (let sy = y0; sy < y1; sy++) {
         if (sy < 0 || sy >= source.height) continue
         for (let sx = x0; sx < x1; sx++) {
@@ -89,16 +93,38 @@ function lightness(
             255
           alpha += a
           light += a * l
+          red += a * source.data[i]!
+          green += a * source.data[i + 1]!
+          blue += a * source.data[i + 2]!
         }
       }
       const count = (y1 - y0) * (x1 - x0)
       if (alpha / count < COVERAGE) continue
       const l = tone.invert ? 1 - light / alpha : light / alpha
-      values[y * width + x] =
-        tone.floor + (tone.ceiling - tone.floor) * l ** tone.gamma
+      const j = y * width + x
+      values[j] = tone.floor + (tone.ceiling - tone.floor) * l ** tone.gamma
+      colors.set([red / alpha, green / alpha, blue / alpha], j * 3)
     }
   }
-  return sharpen(values, width, tone.sharpen)
+  return { values: sharpen(values, width, tone.sharpen), colors }
+}
+
+// Below this saturation a colour counts as grey, and its dot is drawn light
+// grey: outlines and shadows then look as they do in black and white.
+const GREY = 0.18
+// Coloured dots are brightened to at least this value, out of 1, so dots
+// from dark areas still show on black.
+const MIN_VALUE = 0.8
+
+function dotColor(colors: Uint8Array, i: number): [number, number, number] {
+  const r = colors[i * 3]!
+  const g = colors[i * 3 + 1]!
+  const b = colors[i * 3 + 2]!
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  if (max === 0 || (max - min) / max < GREY) return [230, 230, 230]
+  const scale = Math.max(1, (MIN_VALUE * 255) / max)
+  return [r * scale, g * scale, b * scale]
 }
 
 // Pushes each pixel away from the average of its four neighbours.
@@ -137,7 +163,14 @@ const ATKINSON = [
   [0, 2],
 ] as const
 
-function atkinson(values: Float32Array, width: number, height: number) {
+// Without colours, every dot is white. With them, each dot takes the colour
+// of the picture at that spot.
+function atkinson(
+  values: Float32Array,
+  width: number,
+  height: number,
+  colors?: Uint8Array,
+) {
   const output = new PNG({ width, height })
   output.data.fill(0)
 
@@ -155,14 +188,25 @@ function atkinson(values: Float32Array, width: number, height: number) {
         const j = ny * width + nx
         if (values[j]! >= 0) values[j]! += error
       }
-      if (on) output.data.fill(255, i * 4, i * 4 + 4)
+      if (!on) continue
+      output.data.set(
+        colors ? [...dotColor(colors, i), 255] : [255, 255, 255, 255],
+        i * 4,
+      )
     }
   }
   return PNG.sync.write(output)
 }
 
-/** Turns a sprite PNG into a size × size PNG of white dots on transparent. */
-export function ditherSprite(input: Buffer, size: number): Buffer {
+/**
+ * Turns a sprite PNG into a size × size PNG of dots on transparent: white
+ * dots, or dots in the sprite's own colours with `color`.
+ */
+export function ditherSprite(
+  input: Buffer,
+  size: number,
+  color = false,
+): Buffer {
   const source = PNG.sync.read(input)
   const bounds = opaqueBounds(source)
   // A square around the Pokémon, centred, with some margin.
@@ -173,11 +217,8 @@ export function ditherSprite(input: Buffer, size: number): Buffer {
     width: side,
     height: side,
   }
-  return atkinson(
-    lightness(source, square, size, size, SPRITE_TONE),
-    size,
-    size,
-  )
+  const { values, colors } = lightness(source, square, size, size, SPRITE_TONE)
+  return atkinson(values, size, size, color ? colors : undefined)
 }
 
 /**
@@ -188,9 +229,6 @@ export function ditherBanner(input: Buffer, width: number): Buffer {
   const source = PNG.sync.read(input)
   const height = Math.round((width * source.height) / source.width)
   const whole = { x: 0, y: 0, width: source.width, height: source.height }
-  return atkinson(
-    lightness(source, whole, width, height, BANNER_TONE),
-    width,
-    height,
-  )
+  const { values } = lightness(source, whole, width, height, BANNER_TONE)
+  return atkinson(values, width, height)
 }
