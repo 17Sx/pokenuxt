@@ -12,6 +12,7 @@
     "i18n:check": "node ../scripts/check-i18n.mjs locales",
     "typecheck": "tsc --noEmit",
     "test": "bun --bun vitest run",
+    "test:coverage": "bun --bun vitest run --coverage",
     "test:watch": "bun --bun vitest",
     "db:migrate": "bun --env-file=../.env src/migrate.ts"
   },
@@ -28,6 +29,7 @@
     "@eslint/js": "^10.0.1",
     "@types/bun": "^1.4.4",
     "@types/pngjs": "^6.0.5",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",

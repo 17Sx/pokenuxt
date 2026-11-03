@@ -44,7 +44,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
-      - run: bun run test
+      - run: bun run test:coverage
+      # Deploy publishes the report and its badge with the site, in
+      # /coverage/front/.
+      - run: bun scripts/coverage-badge.ts coverage "coverage front" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-front
+          path: coverage
+          retention-days: 30
 
   build:
     name: Build
