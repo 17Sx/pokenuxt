@@ -1,4 +1,4 @@
-import type { NamedAPIResource } from 'pokenode-ts'
+import type { NamedAPIResource, PokemonSpecies } from 'pokenode-ts'
 
 /** Highest number in the national Pokédex. Forms come after, from 10001. */
 export const LAST_NATIONAL_ID = 1025
@@ -23,4 +23,25 @@ export function pokemonLabel(name: string) {
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+/**
+ * Only what a Pokémon page shows of its species, in the site's languages:
+ * names, categories, and the latest description in each.
+ */
+export function speciesIn(species: PokemonSpecies, languages: string[]) {
+  const wanted = (entry: { language: { name: string } }) =>
+    languages.includes(entry.language.name)
+  const latest = new Map<
+    string,
+    PokemonSpecies['flavor_text_entries'][number]
+  >()
+  for (const entry of species.flavor_text_entries.filter(wanted)) {
+    latest.set(entry.language.name, entry)
+  }
+  return {
+    names: species.names.filter(wanted),
+    genera: species.genera.filter(wanted),
+    flavor_text_entries: [...latest.values()],
+  }
 }

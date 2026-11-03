@@ -1,7 +1,0 @@
-# Vercel only builds the Nuxt front. Without this, it turns every file under
-# api/ into a public serverless function: the API runs on AWS (infra/).
-/api
-/infra
-/db
-/e2e
-/scripts

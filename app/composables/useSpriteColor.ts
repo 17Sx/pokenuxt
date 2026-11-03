@@ -39,5 +39,10 @@ export function useSpriteColor() {
     cookie.value = colored.value
   }
 
-  return { isColored, setColored }
+  /** Reads the cookie again: prerendered pages start without it. */
+  function syncWithCookie() {
+    colored.value = cookie.value
+  }
+
+  return { isColored, setColored, syncWithCookie }
 }

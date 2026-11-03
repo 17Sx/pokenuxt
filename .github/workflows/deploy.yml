@@ -1,8 +1,10 @@
 name: Deploy
 
 # Every push to main goes to production, once the front, API and database
-# workflows pass: db/ is applied to the database, the API is deployed to AWS
-# Lambda behind API Gateway, then the front to Vercel.
+# workflows pass: db/ is applied to the database, CDK deploys the API (Lambda
+# behind API Gateway) and the front's S3 bucket and CloudFront distribution,
+# then the front is generated, synced to S3, and CloudFront's cache is
+# invalidated.
 on:
   push:
     branches: [main]
@@ -15,9 +17,6 @@ concurrency:
   group: deploy-production
   # Never stop a deploy halfway; the next one waits.
   cancel-in-progress: false
-
-env:
-  VERCEL_CLI: vercel@65.9.0
 
 jobs:
   front-ci:
@@ -46,62 +45,92 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   api:
-    name: Deploy the API to AWS
+    name: Deploy the API and the front's infrastructure
     needs: migrate
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: ${{ steps.deploy.outputs.url }}
+      url: ${{ steps.deploy.outputs.site }}
     outputs:
-      url: ${{ steps.deploy.outputs.url }}
+      api: ${{ steps.deploy.outputs.api }}
+      site: ${{ steps.deploy.outputs.site }}
+      bucket: ${{ steps.deploy.outputs.bucket }}
+      distribution: ${{ steps.deploy.outputs.distribution }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
 
       # The pokenuxt-github-deploy user (infra/lib/ci-user-stack.ts): it can
-      # only assume the CDK bootstrap roles, which do the deploying.
+      # assume the CDK bootstrap roles, which do the deploying, and publish
+      # the front.
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      # Lambda and API Gateway, with the production front allowed by CORS.
+      # PokenuxtWeb (S3, CloudFront) then PokenuxtApi, whose CORS allows the
+      # CloudFront origin, plus WEB_URL when it is set.
       - id: deploy
         working-directory: infra
         run: |
-          bun run deploy -- --require-approval never --outputs-file cdk.out/outputs.json -c webOrigin=${{ vars.WEB_URL }}
-          echo "url=$(jq -r '.PokenuxtApi.ApiUrl' cdk.out/outputs.json)" >> "$GITHUB_OUTPUT"
+          bun run deploy -- --require-approval never --outputs-file cdk.out/outputs.json ${{ vars.WEB_URL && format('-c webOrigin={0}', vars.WEB_URL) || '' }}
+          {
+            echo "api=$(jq -r '.PokenuxtApi.ApiUrl' cdk.out/outputs.json)"
+            echo "site=$(jq -r '.PokenuxtWeb.SiteUrl' cdk.out/outputs.json)"
+            echo "bucket=$(jq -r '.PokenuxtWeb.BucketName' cdk.out/outputs.json)"
+            echo "distribution=$(jq -r '.PokenuxtWeb.DistributionId' cdk.out/outputs.json)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Check the API answers, wishlist included
         run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/health"
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/wishlist"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.api }}/health"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.api }}/wishlist"
 
   web:
-    name: Deploy the front
+    name: Generate and publish the front
     needs: api
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: ${{ vars.WEB_URL }}
+      url: ${{ needs.api.outputs.site }}
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
-      # The API Gateway URL the pages call from the browser.
-      NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.url }}
-      # On a GitHub runner Nitro would detect GitHub Actions and build a plain
-      # Node server, which Vercel can't deploy.
-      NITRO_PRESET: vercel
+      BUCKET: ${{ needs.api.outputs.bucket }}
+      DISTRIBUTION: ${{ needs.api.outputs.distribution }}
+      SITE: ${{ needs.api.outputs.site }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
 
-      - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      - run: bunx $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      # A static site in .output/public, with every /pokemon/<name> page
+      # prerendered from the names the API lists (nuxt.config.ts).
+      - name: Generate
+        run: bun run generate
+        env:
+          NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.api }}
+          PRERENDER_POKEMON: '1'
 
-      - name: Check the front answers and the API lets it in
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      # Built assets have a hash in their name: cache them for a year. Pages
+      # and payloads change with each deploy: CloudFront keeps them a day,
+      # until the invalidation below, and browsers check every time.
+      - name: Sync to S3
         run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "${{ vars.WEB_URL }}/"
-          curl --fail --silent --show-error --head --header "Origin: ${{ vars.WEB_URL }}" "$NUXT_PUBLIC_API_BASE/health" | grep -i "access-control-allow-origin: ${{ vars.WEB_URL }}"
+          aws s3 sync .output/public "s3://$BUCKET" --delete --exclude "*" --include "_nuxt/*" --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync .output/public "s3://$BUCKET" --delete --exclude "_nuxt/*" --cache-control "public, max-age=0, s-maxage=86400, must-revalidate"
+
+      - name: Invalidate CloudFront
+        run: |
+          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths "/*" --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION" --id "$id"
+
+      - name: Check the site answers and the API lets it in
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "$SITE/"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "$SITE/pokemon/pikachu"
+          curl --fail --silent --show-error --head --header "Origin: $SITE" "${{ needs.api.outputs.api }}/health" | grep -i "access-control-allow-origin: $SITE"
