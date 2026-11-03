@@ -3,6 +3,7 @@ import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm'
 import { connect } from './db'
 import { createHandler } from './lambda-handler'
 import { originsFromEnv } from './create-app'
+import { createPostgresLikes } from './postgres-likes'
 import { createPostgresWishlist } from './postgres-wishlist'
 
 // The Supabase URL is a SecureString in SSM, read once per cold start.
@@ -17,10 +18,11 @@ async function databaseUrl() {
 }
 
 // An instance handles one request at a time, so one connection is enough.
-const wishlist = createPostgresWishlist(connect(await databaseUrl(), 1))
+const sql = connect(await databaseUrl(), 1)
 
 export const handler = createHandler({
-  wishlist,
+  wishlist: createPostgresWishlist(sql),
+  likes: createPostgresLikes(sql),
   origins: originsFromEnv(),
   log: true,
 })

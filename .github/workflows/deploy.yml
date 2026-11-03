@@ -1,7 +1,7 @@
 name: Deploy
 
 # Every push to main goes to production, once the front, API and database
-# workflows pass: db/ is applied to the database, the API is deployed to AWS
+# workflows pass: db/migrations/ is applied to the database, the API is deployed to AWS
 # Lambda behind API Gateway, then the front to Vercel.
 on:
   push:
@@ -73,10 +73,11 @@ jobs:
           bun run deploy -- --require-approval never --outputs-file cdk.out/outputs.json -c webOrigin=${{ vars.WEB_URL }}
           echo "url=$(jq -r '.PokenuxtApi.ApiUrl' cdk.out/outputs.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Check the API answers, wishlist included
+      - name: Check the API answers, wishlist and likes included
         run: |
           curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/health"
           curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/wishlist"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/likes"
 
   web:
     name: Deploy the front

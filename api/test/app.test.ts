@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../src/create-app'
-import { wishlistFromEnv } from '../src/wishlist-from-env'
+import { storesFromEnv } from '../src/stores-from-env'
 
 describe('app', () => {
   const app = createApp()
@@ -30,6 +30,16 @@ describe('app', () => {
     expect(await response.json()).toMatchObject({ error: 'body_too_large' })
   })
 
+  it('refuse aussi un like de plus de 1 Ko', async () => {
+    const response = await app.request('/likes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'a'.repeat(2000), url: 'x' }),
+    })
+
+    expect(response.status).toBe(413)
+  })
+
   it('renvoie un 404 en JSON pour une route inconnue', async () => {
     const response = await app.request('/nope')
 
@@ -38,9 +48,9 @@ describe('app', () => {
   })
 })
 
-describe('wishlistFromEnv', () => {
+describe('storesFromEnv', () => {
   it('refuse de démarrer en production sans DATABASE_URL', () => {
-    expect(() => wishlistFromEnv({ NODE_ENV: 'production' })).toThrow(
+    expect(() => storesFromEnv({ NODE_ENV: 'production' })).toThrow(
       'DATABASE_URL is required in production',
     )
   })

@@ -6,6 +6,7 @@
     "label": "Main navigation",
     "pokedex": "Pokédex",
     "wishlist": "Wishlist",
+    "likes": "Likes",
     "language": "Language"
   },
   "home": {
@@ -25,6 +26,15 @@
     "addShort": "Add to the wishlist",
     "saved": "In the wishlist",
     "failed": "The wishlist couldn’t be updated. Try again in a moment."
+  },
+  "likes": {
+    "title": "Likes",
+    "empty": "No liked Pokémon yet. Like some with the {heart} on a card.",
+    "like": "Like {name}",
+    "unlike": "Unlike {name}",
+    "likeShort": "Like",
+    "liked": "Liked",
+    "failed": "The like couldn’t be saved. Try again in a moment."
   },
   "color": {
     "group": "Colour of {name}",
