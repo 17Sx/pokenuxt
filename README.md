@@ -64,6 +64,14 @@ const { data } = await usePokeApi<Pokemon>('pokemon/pikachu')
 
 The home page banner uses the same dithering, inverted so the outlines become white lines: `bun run banner` turns `scripts/banner-source.png` into `public/banner.png`.
 
+## Prerendering
+
+The Deploy workflow builds every `/pokemon/<name>` page ahead of time: with `PRERENDER_POKEMON=1`, `nuxt.config.ts` asks the API for the names (`prerender/pokemon-routes.ts`) and adds a route for each. `nuxt generate` turns the whole front into static files, which CloudFront serves from S3. Numbers like `/pokemon/25` and unknown names have no page of their own: CloudFront answers with Nuxt's `404.html`, which starts the app in the browser, so `/pokemon/25` still leads to `/pokemon/pikachu`.
+
+- Prerendering takes a few minutes: 3 pages at a time, since each calls the API about three times and API Gateway allows 25 requests a second.
+- A prerendered page was built for no one, so the browser loads what belongs to the visitor once it's hydrated: the wishlist, and the Pokémon they chose to see in colour. A page in English shows French for a moment first.
+- `PRERENDER_POKEMON_LIMIT=5` keeps only the first names, for a quick check: `PRERENDER_POKEMON=1 PRERENDER_POKEMON_LIMIT=5 NUXT_PUBLIC_API_BASE=<api> bun run build`.
+
 ## i18n
 
 The site speaks English and French, with French as the default. A first visit follows the browser's language, and the choice made with the EN / FR switch is kept in the `pokenuxt-lang` cookie. URLs don't change with the language.
@@ -78,7 +86,7 @@ The site speaks English and French, with French as the default. A first visit fo
 - **API** (`.github/workflows/api.yml`), on pull requests and pushes to `dev` that touch `api/`: Prettier, ESLint, type check and Vitest, as parallel jobs. Only the API's dependencies are installed, and everything runs with Bun, Vitest included.
 - **Front** (`.github/workflows/ci.yml`), on every pull request and push to `dev`: lint and format, type check, unit tests, build, and end-to-end tests with the API started alongside.
 - **Database** (`.github/workflows/db.yml`), on pull requests and pushes to `dev` that touch `db/`: applies it to an empty Postgres, then again to check nothing runs twice.
-- **Deploy** (`.github/workflows/deploy.yml`), on every push to `main`: runs the three, applies `db/` to the production database, deploys the API to AWS with CDK and checks `/health` and `/wishlist`, then deploys the front to Vercel with the API Gateway URL, and checks that it answers and that the API's CORS lets it in.
+- **Deploy** (`.github/workflows/deploy.yml`), on every push to `main`: runs the three, applies `db/` to the production database, deploys the API to AWS with CDK and checks `/health` and `/wishlist`, and the front's S3 bucket and CloudFront distribution, then generates the front with the API Gateway URL, syncs it to S3, invalidates CloudFront's cache, and checks that the site answers and that the API's CORS lets it in.
 
 The API workflow also type checks `infra/` and runs `cdk synth --strict`, which bundles the Lambda.
 
@@ -104,14 +112,23 @@ Projects in the new AWS experience can't create OIDC providers, so GitHub Action
 aws iam create-access-key --user-name pokenuxt-github-deploy --profile pokenuxt --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text | { read id secret; gh secret set AWS_ACCESS_KEY_ID --env production --body "$id"; gh secret set AWS_SECRET_ACCESS_KEY --env production --body "$secret"; }
 ```
 
-### Setting up GitHub and Vercel
+### The front on S3 and CloudFront
 
-1. Create a Vercel project for the front, at the repository root (framework Nuxt). Deploys come only from GitHub Actions: `vercel.json` turns off Vercel's own Git deploys.
-2. In GitHub, create a `production` environment with:
-   - secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_WEB_PROJECT_ID`;
-   - secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: the `pokenuxt-github-deploy` user's access key;
-   - secret `DATABASE_URL`: Supabase's **session pooler** URL, used to migrate. GitHub's runners have no IPv6, which the direct `db.<project>.supabase.co` host needs;
-   - variable `WEB_URL`: the front's production URL, which the API's CORS allows.
+`infra/lib/web-stack.ts`:
+
+- A **private S3 bucket**. Only CloudFront reads it, through origin access control, and requests that aren't HTTPS are refused.
+- A **CloudFront distribution** in front, HTTPS only, North America and Europe edge locations. A CloudFront Function turns `/pokemon/pikachu` into `/pokemon/pikachu/index.html`, which S3 doesn't do on its own. Missing pages get Nuxt's `404.html`.
+- The CI user may list and write the bucket, and invalidate this distribution, nothing else.
+
+Assets in `_nuxt/` have a hash in their name and are cached a year. Pages and payloads are cached a day by CloudFront, and each deploy invalidates everything.
+
+### Setting up GitHub
+
+In GitHub, create a `production` environment with:
+
+- secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: the `pokenuxt-github-deploy` user's access key;
+- secret `DATABASE_URL`: Supabase's **session pooler** URL, used to migrate. GitHub's runners have no IPv6, which the direct `db.<project>.supabase.co` host needs;
+- optionally, variable `WEB_URL`: another origin the API's CORS should allow, like a custom domain. The CloudFront one is always allowed.
 
 ### Database
 
