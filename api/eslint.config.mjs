@@ -7,6 +7,7 @@ import tseslint from 'typescript-eslint'
 
 // Prettier owns formatting, ESLint only reports code issues
 export default defineConfig(
+  { ignores: ['coverage/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   { languageOptions: { globals: { ...globals.node, Bun: 'readonly' } } },

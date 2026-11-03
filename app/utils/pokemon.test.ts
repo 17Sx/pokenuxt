@@ -1,6 +1,12 @@
 import type { PokemonSpecies } from 'pokenode-ts'
 import { describe, expect, it } from 'vitest'
-import { speciesIn } from './pokemon'
+import {
+  dexNumber,
+  pokemonId,
+  pokemonLabel,
+  pokemonResource,
+  speciesIn,
+} from './pokemon'
 
 const entry = (language: string, text: string) => ({
   language: { name: language, url: '' },
@@ -52,5 +58,33 @@ describe('speciesIn', () => {
       'genera',
       'names',
     ])
+  })
+})
+
+describe('pokemonId', () => {
+  it("lit le numéro à la fin de l'URL, avec ou sans /", () => {
+    expect(pokemonId(pokemonResource('pikachu', 25))).toBe(25)
+    expect(
+      pokemonId({ name: 'x', url: 'https://pokeapi.co/api/v2/pokemon/10001' }),
+    ).toBe(10001)
+  })
+
+  it('donne NaN pour une URL sans numéro', () => {
+    expect(pokemonId({ name: 'x', url: 'https://pokeapi.co/' })).toBeNaN()
+  })
+})
+
+describe('dexNumber', () => {
+  it('complète à quatre chiffres', () => {
+    expect(dexNumber(25)).toBe('0025')
+    expect(dexNumber(1025)).toBe('1025')
+    expect(dexNumber(10001)).toBe('10001')
+  })
+})
+
+describe('pokemonLabel', () => {
+  it('met une majuscule à chaque partie du nom', () => {
+    expect(pokemonLabel('pikachu')).toBe('Pikachu')
+    expect(pokemonLabel('mr-mime')).toBe('Mr Mime')
   })
 })

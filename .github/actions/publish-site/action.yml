@@ -1,0 +1,36 @@
+name: Publish the generated front
+description: Syncs a generated site to the S3 bucket and invalidates CloudFront's cache. AWS credentials must already be set.
+
+inputs:
+  path:
+    description: The generated site, like .output/public.
+    required: true
+  bucket:
+    description: The PokenuxtWeb bucket.
+    required: true
+  distribution:
+    description: The PokenuxtWeb CloudFront distribution's ID.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Built assets have a hash in their name: cache them for a year. Pages
+    # and payloads change with each release: CloudFront keeps them a day,
+    # until the invalidation below, and browsers check every time.
+    - name: Sync to S3
+      shell: bash
+      env:
+        SITE: ${{ inputs.path }}
+        BUCKET: ${{ inputs.bucket }}
+      run: |
+        aws s3 sync "$SITE" "s3://$BUCKET" --delete --exclude "*" --include "_nuxt/*" --cache-control "public, max-age=31536000, immutable"
+        aws s3 sync "$SITE" "s3://$BUCKET" --delete --exclude "_nuxt/*" --cache-control "public, max-age=0, s-maxage=86400, must-revalidate"
+
+    - name: Invalidate CloudFront
+      shell: bash
+      env:
+        DISTRIBUTION: ${{ inputs.distribution }}
+      run: |
+        id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths "/*" --query Invalidation.Id --output text)
+        aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION" --id "$id"
