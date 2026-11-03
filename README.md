@@ -21,19 +21,21 @@ The API runs on http://localhost:8787 and the front on http://localhost:3000.
 
 ## Scripts
 
-| Script               |                                           |
-| -------------------- | ----------------------------------------- |
-| `bun run dev`        | Front dev server on http://localhost:3000 |
-| `bun run dev:api`    | API dev server on http://localhost:8787   |
-| `bun run build`      | Front production build                    |
-| `bun run typecheck`  | Front type check (`typecheck:api` for it) |
-| `bun run lint`       | Front ESLint (`lint:fix` to autofix)      |
-| `bun run format`     | Prettier (`format:check` in CI)           |
-| `bun run i18n:check` | Locale files against `en.json`            |
-| `bun run test`       | Front unit tests (`test:watch`)           |
-| `bun run test:api`   | API tests                                 |
-| `bun run test:e2e`   | Playwright, with the API started for you  |
-| `bun run banner`     | Re-dither the home page banner            |
+| Script                  |                                                |
+| ----------------------- | ---------------------------------------------- |
+| `bun run dev`           | Front dev server on http://localhost:3000      |
+| `bun run dev:api`       | API dev server on http://localhost:8787        |
+| `bun run build`         | Front production build                         |
+| `bun run typecheck`     | Front type check (`typecheck:api` for it)      |
+| `bun run lint`          | Front ESLint (`lint:fix` to autofix)           |
+| `bun run format`        | Prettier (`format:check` in CI)                |
+| `bun run i18n:check`    | Locale files against `en.json`                 |
+| `bun run test`          | Front unit tests (`test:watch`)                |
+| `bun run test:coverage` | Front unit tests with coverage, in `coverage/` |
+| `bun run test:api`      | API tests                                      |
+| `bun run test:e2e`      | Playwright, with the API started for you       |
+| `bun scripts/smoke.ts`  | Smoke tests of a live release (see below)      |
+| `bun run banner`        | Re-dither the home page banner                 |
 
 ## API
 
@@ -69,6 +71,14 @@ const { data } = await usePokeApi<Pokemon>('pokemon/pikachu')
 
 The home page banner uses the same dithering, inverted so the outlines become white lines: `bun run banner` turns `scripts/banner-source.png` into `public/banner.png`.
 
+## Prerendering
+
+The Deploy workflow builds every `/pokemon/<name>` page ahead of time: with `PRERENDER_POKEMON=1`, `nuxt.config.ts` asks the API for the names (`prerender/pokemon-routes.ts`) and adds a route for each. `nuxt generate` turns the whole front into static files, which CloudFront serves from S3. Numbers like `/pokemon/25` and unknown names have no page of their own: CloudFront answers with Nuxt's `404.html`, which starts the app in the browser, so `/pokemon/25` still leads to `/pokemon/pikachu`.
+
+- Prerendering takes a few minutes: 3 pages at a time, since each calls the API about three times and API Gateway allows 25 requests a second.
+- A prerendered page was built for no one, so the browser loads what belongs to the visitor once it's hydrated: the wishlist, and the Pokémon they chose to see in colour. A page in English shows French for a moment first.
+- `PRERENDER_POKEMON_LIMIT=5` keeps only the first names, for a quick check: `PRERENDER_POKEMON=1 PRERENDER_POKEMON_LIMIT=5 NUXT_PUBLIC_API_BASE=<api> bun run build`.
+
 ## i18n
 
 The site speaks English and French, with French as the default. A first visit follows the browser's language, and the choice made with the EN / FR switch is kept in the `pokenuxt-lang` cookie. URLs don't change with the language.
@@ -80,10 +90,43 @@ The site speaks English and French, with French as the default. A first visit fo
 
 ## CI/CD
 
-- **API** (`.github/workflows/api.yml`), on pull requests and pushes to `dev` that touch `api/`: Prettier, ESLint, type check and Vitest, as parallel jobs. Only the API's dependencies are installed, and everything runs with Bun, Vitest included.
-- **Front** (`.github/workflows/ci.yml`), on every pull request and push to `dev`: lint and format, type check, unit tests, build, and end-to-end tests with the API started alongside.
+- **API** (`.github/workflows/api.yml`), on pull requests and pushes to `dev` that touch `api/`: Prettier, ESLint, type check and Vitest with coverage, as parallel jobs. Only the API's dependencies are installed, and everything runs with Bun, Vitest included.
+- **Front** (`.github/workflows/ci.yml`), on every pull request and push to `dev`: lint and format, type check, unit tests with coverage, build, and end-to-end tests with the API started alongside.
 - **Database** (`.github/workflows/db.yml`), on pull requests and pushes to `dev` that touch `db/`: applies the migrations to an empty Postgres, then again to check nothing runs twice.
-- **Deploy** (`.github/workflows/deploy.yml`), on every push to `main`: runs the three, applies the migrations to the production database, deploys the API to AWS with CDK and checks `/health`, `/wishlist` and `/likes`, then deploys the front to Vercel with the API Gateway URL, and checks that it answers and that the API's CORS lets it in.
+- **Deploy** (`.github/workflows/deploy.yml`), on every push to `main`: runs the three, applies the migrations to the production database, deploys the API and the front's S3 bucket and CloudFront distribution to AWS with CDK, then publishes the front twice, at the same time: generated (SSG) to S3, with CloudFront's cache invalidated, and server-rendered (SSR) to Vercel. Smoke tests then check the live release, and the deploy fails if one doesn't pass.
+- **Rollback** (`.github/workflows/rollback.yml`), run by hand: publishes a previous stable release again. See below.
+
+### Smoke tests
+
+`scripts/smoke.ts` (checks in `scripts/smoke-checks.ts`) reads every URL without running JavaScript, the way curl or a crawler does, so a page counts only if its **raw HTML** has the content:
+
+- **API**: `/health` answers `{"ok":true}`, the PokéAPI proxy, `/wishlist` and `/likes` answer 200, an unknown route 404, and its CORS lets both fronts in.
+- **SSG (CloudFront)** and **SSR (Vercel)**: the home page, `/pokemon/pikachu` and `/pokemon/bulbasaur` answer 200 with the right `<title>` (`Pikachu — PokéNuxt`), `<h1>`, `lang="fr"`, number and types; `/pokemon/missingno` answers 404; the prerendered payload is there.
+- **SSR only**: with the `pokenuxt-lang=en` cookie the HTML comes back in English (`Bulbasaur — PokéNuxt`), which a generated page can't do, and `/pokemon/25` answers a 301 to `/pokemon/pikachu`.
+- **Version**: both fronts serve `/version.json`, which must name the commit just deployed.
+
+Each URL gets 4 tries, 5 seconds apart, for the CDN to catch up. The results go to the run's summary, and any failure fails the run.
+
+```bash
+SMOKE_API=https://p03y7ni65h.execute-api.eu-north-1.amazonaws.com SMOKE_SSR=https://pokenuxt-mauve.vercel.app SMOKE_SSG=https://d1jjigkssadg5n.cloudfront.net bun scripts/smoke.ts
+```
+
+### Rollback
+
+Each Deploy run keeps what it published as artifacts, for 90 days: the CDK assembly with the Lambda bundle (`release-infra`), the generated site (`release-ssg`) and Vercel's prebuilt output (`release-ssr`). A run whose smoke tests pass also keeps `release`, a `release.json` with its commit and URLs: that makes it a **stable release**.
+
+Run **Rollback** from the Actions tab, or:
+
+```bash
+gh workflow run rollback.yml                 # the previous stable release
+gh workflow run rollback.yml -f run=<run-id> # a given Deploy run
+```
+
+Without a run ID, it reads the commit live now from `/version.json` and picks the newest stable release built from another commit. It deploys that release's CDK assembly, syncs its site to S3 and invalidates CloudFront, deploys its Vercel output to production, then runs the smoke tests against that commit. Nothing is rebuilt. The database stays as it is: migrations only ever add, so an older API still works with it. The next push to `main` deploys the latest code again.
+
+### Coverage
+
+The front's and the API's unit tests run with V8 coverage in CI (`bun run test:coverage`, and the same in `api/`). Each job uploads its HTML report and a [shields.io](https://shields.io/badges/endpoint-badge) badge (`scripts/coverage-badge.ts`), and Deploy publishes them with the site, at [`/coverage/front/`](https://d1jjigkssadg5n.cloudfront.net/coverage/front/) and [`/coverage/api/`](https://d1jjigkssadg5n.cloudfront.net/coverage/api/): the badges above read them. The front's count covers `app/utils`, `app/composables`, `prerender/` and `scripts/`; components and pages are left to the end-to-end tests.
 
 The API workflow also type checks `infra/` and runs `cdk synth --strict`, which bundles the Lambda.
 
@@ -109,14 +152,24 @@ Projects in the new AWS experience can't create OIDC providers, so GitHub Action
 aws iam create-access-key --user-name pokenuxt-github-deploy --profile pokenuxt --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text | { read id secret; gh secret set AWS_ACCESS_KEY_ID --env production --body "$id"; gh secret set AWS_SECRET_ACCESS_KEY --env production --body "$secret"; }
 ```
 
-### Setting up GitHub and Vercel
+### The front on S3 and CloudFront
 
-1. Create a Vercel project for the front, at the repository root (framework Nuxt). Deploys come only from GitHub Actions: `vercel.json` turns off Vercel's own Git deploys.
-2. In GitHub, create a `production` environment with:
-   - secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_WEB_PROJECT_ID`;
-   - secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: the `pokenuxt-github-deploy` user's access key;
-   - secret `DATABASE_URL`: Supabase's **session pooler** URL, used to migrate. GitHub's runners have no IPv6, which the direct `db.<project>.supabase.co` host needs;
-   - variable `WEB_URL`: the front's production URL, which the API's CORS allows.
+`infra/lib/web-stack.ts`:
+
+- A **private S3 bucket**. Only CloudFront reads it, through origin access control, and requests that aren't HTTPS are refused.
+- A **CloudFront distribution** in front, HTTPS only, North America and Europe edge locations. A CloudFront Function turns `/pokemon/pikachu` into `/pokemon/pikachu/index.html`, which S3 doesn't do on its own. Missing pages get Nuxt's `404.html`.
+- The CI user may list and write the bucket, and invalidate this distribution, nothing else.
+
+Assets in `_nuxt/` have a hash in their name and are cached a year. Pages and payloads are cached a day by CloudFront, and each deploy invalidates everything.
+
+### Setting up GitHub
+
+In GitHub, create a `production` environment with:
+
+- secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: the `pokenuxt-github-deploy` user's access key;
+- secret `DATABASE_URL`: Supabase's **session pooler** URL, used to migrate. GitHub's runners have no IPv6, which the direct `db.<project>.supabase.co` host needs;
+- secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_WEB_PROJECT_ID`: a Vercel token and the IDs in the project's `.vercel/project.json`, for the SSR front. Vercel's own Git deploys are off (`vercel.json`), and `.vercelignore` keeps `api/` from becoming Vercel functions;
+- variable `WEB_URL`: the Vercel front's production URL. The API's CORS allows it, and the smoke tests check it. The CloudFront origin is always allowed.
 
 ### Database
 

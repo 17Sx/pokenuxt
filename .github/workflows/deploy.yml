@@ -1,8 +1,14 @@
 name: Deploy
 
 # Every push to main goes to production, once the front, API and database
-# workflows pass: db/migrations/ is applied to the database, the API is deployed to AWS
-# Lambda behind API Gateway, then the front to Vercel.
+# workflows pass: db/migrations/ is applied to the database, CDK deploys the API (Lambda
+# behind API Gateway) and the front's S3 bucket and CloudFront distribution,
+# then the front is published twice: generated (SSG) to S3 and CloudFront,
+# and server-rendered (SSR) to Vercel. Smoke tests check the live release,
+# and the run fails when a critical URL doesn't answer as it should.
+#
+# Each run keeps what it published as artifacts. A run that passes is a
+# stable release that rollback.yml can publish again.
 on:
   push:
     branches: [main]
@@ -18,6 +24,8 @@ concurrency:
 
 env:
   VERCEL_CLI: vercel@65.9.0
+  # Kept as long as GitHub allows, for rollbacks.
+  RELEASE_RETENTION_DAYS: 90
 
 jobs:
   front-ci:
@@ -46,41 +54,105 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   api:
-    name: Deploy the API to AWS
+    name: Deploy the API and the front's infrastructure
     needs: migrate
     runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.url }}
+    environment: production
     outputs:
-      url: ${{ steps.deploy.outputs.url }}
+      api: ${{ steps.deploy.outputs.api }}
+      site: ${{ steps.deploy.outputs.site }}
+      bucket: ${{ steps.deploy.outputs.bucket }}
+      distribution: ${{ steps.deploy.outputs.distribution }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
 
       # The pokenuxt-github-deploy user (infra/lib/ci-user-stack.ts): it can
-      # only assume the CDK bootstrap roles, which do the deploying.
+      # assume the CDK bootstrap roles, which do the deploying, and publish
+      # the front.
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      # Lambda and API Gateway, with the production front allowed by CORS.
+      # PokenuxtWeb (S3, CloudFront) then PokenuxtApi, whose CORS allows the
+      # CloudFront origin, plus WEB_URL (Vercel) when it is set.
       - id: deploy
         working-directory: infra
         run: |
-          bun run deploy -- --require-approval never --outputs-file cdk.out/outputs.json -c webOrigin=${{ vars.WEB_URL }}
-          echo "url=$(jq -r '.PokenuxtApi.ApiUrl' cdk.out/outputs.json)" >> "$GITHUB_OUTPUT"
+          bun run deploy -- --require-approval never --outputs-file cdk.out/outputs.json ${{ vars.WEB_URL && format('-c webOrigin={0}', vars.WEB_URL) || '' }}
+          {
+            echo "api=$(jq -r '.PokenuxtApi.ApiUrl' cdk.out/outputs.json)"
+            echo "site=$(jq -r '.PokenuxtWeb.SiteUrl' cdk.out/outputs.json)"
+            echo "bucket=$(jq -r '.PokenuxtWeb.BucketName' cdk.out/outputs.json)"
+            echo "distribution=$(jq -r '.PokenuxtWeb.DistributionId' cdk.out/outputs.json)"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Check the API answers, wishlist and likes included
-        run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/health"
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/wishlist"
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.url }}/likes"
+      # The synthesized assembly, Lambda bundle included: a rollback deploys
+      # it again as it is, without building anything.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-infra
+          path: infra/cdk.out
+          include-hidden-files: true
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
 
-  web:
-    name: Deploy the front
+  ssg:
+    name: Generate and publish the front to S3
+    needs: api
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ needs.api.outputs.site }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      # A static site in .output/public, with every /pokemon/<name> page
+      # prerendered from the names the API lists (nuxt.config.ts).
+      - name: Generate
+        run: bun run generate
+        env:
+          NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.api }}
+          PRERENDER_POKEMON: '1'
+
+      # The commit this release was built from, which the smoke tests and
+      # rollbacks read.
+      - run: printf '{"commit":"%s","run":%s}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > .output/public/version.json
+
+      # The Vitest reports from front-ci and api-ci, with their badges, at
+      # /coverage/front/ and /coverage/api/.
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-front
+          path: .output/public/coverage/front
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-api
+          path: .output/public/coverage/api
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ssg
+          path: .output/public
+          include-hidden-files: true
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - uses: ./.github/actions/publish-site
+        with:
+          path: .output/public
+          bucket: ${{ needs.api.outputs.bucket }}
+          distribution: ${{ needs.api.outputs.distribution }}
+
+  ssr:
+    name: Build and publish the front to Vercel
     needs: api
     runs-on: ubuntu-latest
     environment:
@@ -89,8 +161,8 @@ jobs:
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
-      # The API Gateway URL the pages call from the browser.
-      NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.url }}
+      # The API Gateway URL the pages call, from the server and the browser.
+      NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.api }}
       # On a GitHub runner Nitro would detect GitHub Actions and build a plain
       # Node server, which Vercel can't deploy.
       NITRO_PRESET: vercel
@@ -98,11 +170,52 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
 
+      # Vercel's own Git deploys are off (vercel.json): this job is the only
+      # way a release reaches it.
       - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - run: bunx $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - run: printf '{"commit":"%s","run":%s}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > .vercel/output/static/version.json
+
+      # The prebuilt output: a rollback deploys it again as it is.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ssr
+          path: .vercel/output
+          include-hidden-files: true
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
+
       - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Check the front answers and the API lets it in
-        run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "${{ vars.WEB_URL }}/"
-          curl --fail --silent --show-error --head --header "Origin: ${{ vars.WEB_URL }}" "$NUXT_PUBLIC_API_BASE/health" | grep -i "access-control-allow-origin: ${{ vars.WEB_URL }}"
+  smoke:
+    name: Check the live release
+    needs: [api, ssg, ssr]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # /health, SSR and SSG pages read as raw HTML, HTTP codes, CORS and the
+      # published commit. Any failure fails the deploy.
+      - run: bun scripts/smoke.ts
+        env:
+          SMOKE_API: ${{ needs.api.outputs.api }}
+          SMOKE_SSG: ${{ needs.api.outputs.site }}
+          SMOKE_SSR: ${{ vars.WEB_URL }}
+          SMOKE_VERSION: ${{ github.sha }}
+
+      # Only a release that passed gets this: rollback.yml looks for it.
+      - run: |
+          jq -n \
+            --arg commit "$GITHUB_SHA" --argjson run "$GITHUB_RUN_ID" \
+            --arg api "${{ needs.api.outputs.api }}" --arg ssg "${{ needs.api.outputs.site }}" --arg ssr "${{ vars.WEB_URL }}" \
+            --arg bucket "${{ needs.api.outputs.bucket }}" --arg distribution "${{ needs.api.outputs.distribution }}" \
+            '{commit: $commit, run: $run, api: $api, ssg: $ssg, ssr: $ssr, bucket: $bucket, distribution: $distribution}' > release.json
+          cat release.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.json
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}

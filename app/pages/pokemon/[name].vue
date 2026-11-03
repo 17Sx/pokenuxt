@@ -3,34 +3,71 @@ import type { NamedAPIResourceList, Pokemon, PokemonSpecies } from 'pokenode-ts'
 
 const STAT_MAX = 255
 
-const { locale, t, te } = useI18n()
+// /pokemon/25 and /pokemon/Pikachu both lead to /pokemon/pikachu. This runs
+// before the page, which a redirect from its setup would leave half-run.
+definePageMeta({
+  middleware: async (to) => {
+    const slug = String(to.params.name)
+    if (/^\d{1,6}$/.test(slug)) {
+      try {
+        const { name } = await fetchPokeApi<Pokemon>(`pokemon/${slug}`)
+        return navigateTo(`/pokemon/${name}`, { redirectCode: 301 })
+      } catch (error) {
+        return abortNavigation(
+          (error as { statusCode?: number }).statusCode === 404
+            ? createError({ statusCode: 404, message: 'Pokémon not found' })
+            : createError({
+                statusCode: 503,
+                message: 'The API is unavailable',
+              }),
+        )
+      }
+    }
+    if (slug !== slug.toLowerCase()) {
+      return navigateTo(`/pokemon/${slug.toLowerCase()}`, { redirectCode: 301 })
+    }
+  },
+})
+
+const { locale, locales, t, te } = useI18n()
 
 const route = useRoute()
 const slug = String(route.params.name)
-if (!/^[a-z0-9-]{1,100}$/i.test(slug)) {
-  throw createError({ statusCode: 404, statusMessage: 'Pokémon introuvable' })
+if (!/^[a-z0-9-]{1,100}$/.test(slug)) {
+  throw createError({ statusCode: 404, message: 'Pokémon not found' })
 }
 
-const { data: pokemon } = await usePokeApi<Pokemon>(
-  `pokemon/${slug.toLowerCase()}`,
-)
+// Only what the page shows: a Pokémon from PokéAPI also lists every move and
+// game, hundreds of kilobytes that would end up in each prerendered page.
+const { data: pokemon, error } = await usePokeApi<Pokemon>(`pokemon/${slug}`, {
+  pick: [
+    'id',
+    'name',
+    'height',
+    'weight',
+    'base_experience',
+    'species',
+    'types',
+    'stats',
+  ],
+})
 if (!pokemon.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Pokémon introuvable' })
-}
-
-// /pokemon/25 and /pokemon/Pikachu both lead to /pokemon/pikachu.
-if (slug !== pokemon.value.name) {
-  await navigateTo(`/pokemon/${pokemon.value.name}`, {
-    redirectCode: 301,
-    replace: true,
-  })
+  // Only the API's 404 means there is no such Pokémon. Anything else is a
+  // failure worth retrying, never a "not found" page to prerender.
+  throw error.value?.statusCode === 404
+    ? createError({ statusCode: 404, message: 'Pokémon not found' })
+    : createError({ statusCode: 503, message: 'The API is unavailable' })
 }
 
 const id = pokemon.value.id
 
-const { data: species } = await usePokeApi<PokemonSpecies>(
-  `pokemon-species/${pokemon.value.species.name}`,
-)
+const siteLocales = locales.value.map((l) => l.code as string)
+const { data: species } = await usePokeApi<
+  PokemonSpecies,
+  ReturnType<typeof speciesIn>
+>(`pokemon-species/${pokemon.value.species.name}`, {
+  transform: (data) => speciesIn(data, siteLocales),
+})
 
 // PokéAPI gives names, categories and descriptions in many languages.
 const inLocale = <T extends { language: { name: string } }>(entries?: T[]) =>

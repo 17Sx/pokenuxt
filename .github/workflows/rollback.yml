@@ -1,0 +1,187 @@
+name: Rollback
+
+# Publishes a stable release again: a Deploy run whose smoke tests passed,
+# from the artifacts it kept. Nothing is rebuilt: the same CDK assembly, the
+# same generated site and the same Vercel output go back live, then the smoke
+# tests check them. The database is left as it is: migrations only add.
+#
+# Without a run ID it restores the last stable release other than the one
+# live now, which it reads from the site's /version.json.
+on:
+  workflow_dispatch:
+    inputs:
+      run:
+        description: ID of the Deploy run to restore (empty = the previous stable release)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  # To list Deploy runs and download their artifacts.
+  actions: read
+
+concurrency:
+  # The same group as Deploy: never both at once.
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_CLI: vercel@65.9.0
+
+jobs:
+  pick:
+    name: Find the release to restore
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.pick.outputs.run }}
+      commit: ${{ steps.pick.outputs.commit }}
+      release: ${{ steps.pick.outputs.release }}
+    steps:
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WANTED: ${{ inputs.run }}
+        run: |
+          # Deploy runs that passed and kept their release, newest first.
+          stable() {
+            gh run list --repo "$REPO" --workflow deploy.yml --status success --limit 50 --json databaseId -q '.[].databaseId' |
+              while read -r id; do
+                if gh api "repos/$REPO/actions/runs/$id/artifacts" -q '.artifacts[] | select(.name == "release" and (.expired | not)) | .name' | grep -q .; then
+                  echo "$id"
+                fi
+              done
+          }
+          release() {
+            rm -rf release && gh run download "$1" --repo "$REPO" --name release --dir release && cat release/release.json
+          }
+
+          if [ -n "$WANTED" ]; then
+            run="$WANTED"
+            release "$run" > picked.json || { echo "::error::Run $run kept no release: it failed or its artifacts expired."; exit 1; }
+          else
+            runs=$(stable)
+            [ -n "$runs" ] || { echo "::error::No stable release to restore."; exit 1; }
+            newest=$(echo "$runs" | head -n 1)
+            site=$(release "$newest" | jq -r .ssg)
+            live=$(curl --fail --silent --show-error "$site/version.json" | jq -r .commit || true)
+            echo "Live now: ${live:-unknown}"
+            run=""
+            for id in $runs; do
+              release "$id" > candidate.json
+              if [ "$(jq -r .commit candidate.json)" != "$live" ]; then
+                run="$id" && mv candidate.json picked.json && break
+              fi
+            done
+            [ -n "$run" ] || { echo "::error::No stable release other than the live one."; exit 1; }
+          fi
+
+          commit=$(jq -r .commit picked.json)
+          {
+            echo "run=$run"
+            echo "commit=$commit"
+            echo "release=$(jq -c . picked.json)"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Restoring $commit"
+            echo ""
+            echo "From Deploy run [$run](https://github.com/$REPO/actions/runs/$run)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  api:
+    name: Deploy the release's API and infrastructure
+    needs: pick
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-infra
+          path: infra/release.out
+          run-id: ${{ needs.pick.outputs.run }}
+          github-token: ${{ github.token }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      # The assembly as it was synthesized: same templates, same Lambda bundle.
+      - working-directory: infra
+        run: bunx cdk deploy --app release.out PokenuxtWeb PokenuxtApi --require-approval never
+
+  ssg:
+    name: Publish the release's front to S3
+    needs: [pick, api]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-ssg
+          path: site
+          run-id: ${{ needs.pick.outputs.run }}
+          github-token: ${{ github.token }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - uses: ./.github/actions/publish-site
+        with:
+          path: site
+          bucket: ${{ fromJSON(needs.pick.outputs.release).bucket }}
+          distribution: ${{ fromJSON(needs.pick.outputs.release).distribution }}
+
+  ssr:
+    name: Publish the release's front to Vercel
+    needs: [pick, api]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # Links the folder to the project, then puts the release's prebuilt
+      # output where vercel deploy --prebuilt looks for it.
+      - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-ssr
+          path: .vercel/output
+          run-id: ${{ needs.pick.outputs.run }}
+          github-token: ${{ github.token }}
+      - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  smoke:
+    name: Check the restored release
+    needs: [pick, ssg, ssr]
+    runs-on: ubuntu-latest
+    steps:
+      # The release's own smoke tests: an older release may lack routes the
+      # newer checks expect.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.pick.outputs.commit }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun scripts/smoke.ts
+        env:
+          SMOKE_API: ${{ fromJSON(needs.pick.outputs.release).api }}
+          SMOKE_SSG: ${{ fromJSON(needs.pick.outputs.release).ssg }}
+          SMOKE_SSR: ${{ fromJSON(needs.pick.outputs.release).ssr }}
+          SMOKE_VERSION: ${{ needs.pick.outputs.commit }}

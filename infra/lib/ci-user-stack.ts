@@ -8,12 +8,14 @@ import type { Construct } from 'constructs'
  * It can only assume the CDK bootstrap roles of this account and Region, and
  * those do the actual deploying.
  */
+export const CI_USER_NAME = 'pokenuxt-github-deploy'
+
 export class CiUserStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props)
 
     const user = new User(this, 'GithubDeploy', {
-      userName: 'pokenuxt-github-deploy',
+      userName: CI_USER_NAME,
     })
     user.addToPolicy(
       new PolicyStatement({

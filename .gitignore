@@ -33,3 +33,6 @@ logs
 
 # AWS CDK
 infra/cdk.out
+
+# Vitest coverage
+coverage
