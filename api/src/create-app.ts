@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
+import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { secureHeaders } from 'hono/secure-headers'
@@ -14,17 +15,39 @@ export type AppOptions = {
   wishlist?: Wishlist
   /** Used for PokéAPI and sprites. Tests pass a fake one. */
   fetch?: typeof fetch
+  /** Sites whose pages may call the API from the browser. */
+  origins?: string[]
   log?: boolean
+}
+
+/** CORS_ORIGINS, comma-separated, or the local front by default. */
+export function originsFromEnv(env = process.env) {
+  const origins = env.CORS_ORIGINS?.split(',').map((o) => o.trim())
+  return origins?.filter(Boolean).length
+    ? origins.filter(Boolean)
+    : ['http://localhost:3000']
 }
 
 export function createApp({
   wishlist = createMemoryWishlist(),
   fetch: fetcher = fetch,
+  origins = originsFromEnv(),
   log = false,
 }: AppOptions = {}) {
   const app = new Hono()
   if (log) app.use(logger())
-  app.use(secureHeaders())
+  // The front calls the API from the browser. No cookies are involved, so
+  // credentials stay off and only the listed origins are allowed.
+  app.use(
+    cors({
+      origin: origins,
+      allowMethods: ['GET', 'POST', 'DELETE'],
+      allowHeaders: ['content-type', 'accept-language'],
+      maxAge: 3600,
+    }),
+  )
+  // Sprites are shown on the front's own domain: let other origins load them.
+  app.use(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }))
   // A wishlist entry is { name, url }: nothing bigger is ever needed.
   app.use(
     '/wishlist/*',

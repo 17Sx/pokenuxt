@@ -4,8 +4,9 @@ Nuxt 4 · Tailwind CSS v4 · Hono · données [PokéAPI](https://pokeapi.co)
 
 ## Architecture
 
-- **`app/`**: the Nuxt front. It has no server logic of its own: Nuxt relays every `/api/**` request to the Hono API (`routeRules` in `nuxt.config.ts`, target `API_URL`, `http://localhost:8787` by default). The browser stays on one domain.
-- **`api/`**: the Hono API, a Bun workspace. It calls PokéAPI, dithers the sprites and keeps the wishlist.
+- **`app/`**: the Nuxt front. It has no server logic of its own: pages call the Hono API straight from the browser, at `runtimeConfig.public.apiBase` (`NUXT_PUBLIC_API_BASE`, `http://localhost:8787` by default). The API's CORS lists the front's origins.
+- **`api/`**: the Hono API, a Bun workspace. It calls PokéAPI, dithers the sprites and keeps the wishlist. In production it runs on **AWS Lambda behind API Gateway** (`src/lambda.ts`), locally on Bun (`src/serve.ts`).
+- **`infra/`**: the AWS infrastructure, with AWS CDK in TypeScript.
 - **`db/`**: the Postgres schema. `init.sql` creates the wishlist table; later changes go in `db/migrations/`, as `.sql` files applied in name order.
 
 ## Setup
@@ -77,18 +78,36 @@ The site speaks English and French, with French as the default. A first visit fo
 - **API** (`.github/workflows/api.yml`), on pull requests and pushes to `dev` that touch `api/`: Prettier, ESLint, type check and Vitest, as parallel jobs. Only the API's dependencies are installed, and everything runs with Bun, Vitest included.
 - **Front** (`.github/workflows/ci.yml`), on every pull request and push to `dev`: lint and format, type check, unit tests, build, and end-to-end tests with the API started alongside.
 - **Database** (`.github/workflows/db.yml`), on pull requests and pushes to `dev` that touch `db/`: applies it to an empty Postgres, then again to check nothing runs twice.
-- **Deploy** (`.github/workflows/deploy.yml`), on every push to `main`: runs the three, applies `db/` to the production database, then deploys the API, checks `/health`, deploys the front, and checks that it answers and reaches the API through `/api/health`.
+- **Deploy** (`.github/workflows/deploy.yml`), on every push to `main`: runs the three, applies `db/` to the production database, deploys the API to AWS with CDK and checks `/health` and `/wishlist`, then deploys the front to Vercel with the API Gateway URL, and checks that it answers and that the API's CORS lets it in.
+
+The API workflow also type checks `infra/` and runs `cdk synth --strict`, which bundles the Lambda.
 
 The API has its own config and scripts, run from `api/`: `bun run lint`, `bun run format:check`, `bun run typecheck` and `bun run test`.
 
-### Setting up Vercel
+### AWS
 
-1. Create two Vercel projects from this repository: one with **Root Directory** `api` (framework Hono), one with the repository root (framework Nuxt). Deploys come only from GitHub Actions: `vercel.json` turns off Vercel's own Git deploys.
+The API runs in the project's Region, `eu-north-1` (`infra/bin/pokenuxt.ts`):
+
+- **Lambda** (Node.js 22, arm64, 1 GB since dithering is CPU-bound), bundled from `api/src/lambda.ts` by esbuild. `@hono/aws-lambda` turns API Gateway events into requests, sprites included, sent back as base64.
+- **API Gateway HTTP API** in front, with every route going to the Lambda. Its CORS allows `http://localhost:3000` and the front's production origin (`-c webOrigin=…`), for `GET`, `POST` and `DELETE`, without credentials. The stage is throttled to 25 requests a second, bursts of 50.
+- **Supabase**: the Lambda reads Supabase's **transaction pooler** URL (port 6543, made for serverless) from the SSM SecureString `/pokenuxt/database-url` when it starts, and keeps one connection per instance. Its role can read that parameter and nothing else in SSM.
+
+From `infra/`, with an AWS profile: `bun run synth`, `bun run diff`, `bun run deploy`. Setting it up once:
+
+1. `aws login --profile pokenuxt`, then `npx cdk bootstrap aws://<account>/eu-north-1` with `AWS_PROFILE=pokenuxt`.
+2. Store the transaction pooler URL: `aws ssm put-parameter --name /pokenuxt/database-url --type SecureString --value '<url>'`.
+3. `bun run deploy` for the API, and `bun run deploy:ci-user` for the CI user.
+
+Projects in the new AWS experience can't create OIDC providers, so GitHub Actions can't use OIDC. CI deploys as the IAM user `pokenuxt-github-deploy` (`infra/lib/ci-user-stack.ts`), which can only assume the CDK bootstrap roles. Its access key lives in GitHub's secrets; rotate it from time to time.
+
+### Setting up GitHub and Vercel
+
+1. Create a Vercel project for the front, at the repository root (framework Nuxt). Deploys come only from GitHub Actions: `vercel.json` turns off Vercel's own Git deploys.
 2. In GitHub, create a `production` environment with:
-   - secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_API_PROJECT_ID` and `VERCEL_WEB_PROJECT_ID`;
-   - variables `API_URL` (the API's production URL, like `https://pokenuxt-api.vercel.app`) and `WEB_URL` (the front's);
-   - secret `DATABASE_URL`: Supabase's **session pooler** URL, used to migrate. GitHub's runners have no IPv6, which the direct `db.<project>.supabase.co` host needs.
-3. In the API's Vercel project, set `DATABASE_URL` to Supabase's **transaction pooler** URL (port 6543), for serverless functions.
+   - secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_WEB_PROJECT_ID`;
+   - secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: the `pokenuxt-github-deploy` user's access key;
+   - secret `DATABASE_URL`: Supabase's **session pooler** URL, used to migrate. GitHub's runners have no IPv6, which the direct `db.<project>.supabase.co` host needs;
+   - variable `WEB_URL`: the front's production URL, which the API's CORS allows.
 
 ### Database
 

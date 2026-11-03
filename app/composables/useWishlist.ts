@@ -5,7 +5,7 @@ type WishlistResponse = { items: NamedAPIResource[] }
 /** Loads the visitor's wishlist from the API. An unreachable API gives an empty list. */
 export async function fetchWishlist() {
   try {
-    const { items } = await useRequestFetch()<WishlistResponse>('/api/wishlist')
+    const { items } = await $fetch<WishlistResponse>(useApiUrl()('wishlist'))
     return items
   } catch {
     return []
@@ -20,6 +20,7 @@ export function useWishlist() {
   // What the API answered when the last change failed, in the site's language.
   const error = useState<string | null>('wishlist-error', () => null)
   const { $i18n } = useNuxtApp()
+  const url = useApiUrl()
 
   const headers = () => ({ 'accept-language': $i18n.locale.value })
 
@@ -36,7 +37,7 @@ export function useWishlist() {
     wishlist.value = [...wishlist.value, pokemon]
     error.value = null
     try {
-      await $fetch('/api/wishlist', {
+      await $fetch(url('wishlist'), {
         method: 'POST',
         headers: headers(),
         body: { name: pokemon.name, url: pokemon.url },
@@ -54,7 +55,7 @@ export function useWishlist() {
     wishlist.value = before.filter((p) => p.name !== pokemon.name)
     error.value = null
     try {
-      await $fetch(`/api/wishlist/${pokemonId(pokemon)}`, {
+      await $fetch(url(`wishlist/${pokemonId(pokemon)}`), {
         method: 'DELETE',
         headers: headers(),
       })

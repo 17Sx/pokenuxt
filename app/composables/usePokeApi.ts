@@ -4,12 +4,13 @@ export function usePokeApi<T>(
   path: MaybeRefOrGetter<string>,
   options: UseFetchOptions<T> = {},
 ) {
-  return useFetch(() => `/api/pokeapi/${toValue(path)}`, options)
+  const url = useApiUrl()
+  return useFetch(() => url(`pokeapi/${toValue(path)}`), options)
 }
 
 export function fetchPokeApi<T>(
   path: string,
   query?: Record<string, string | number>,
 ) {
-  return $fetch<T>(`/api/pokeapi/${path}`, { query })
+  return $fetch<T>(useApiUrl()(`pokeapi/${path}`), { query })
 }

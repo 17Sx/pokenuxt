@@ -5,9 +5,9 @@ const props = withDefaults(
 )
 
 const { isColored } = useSpriteColor()
-const src = computed(
-  () =>
-    `/api/sprite/${props.id}?s=${props.size}${isColored(props.id) ? '&c=1' : ''}`,
+const url = useApiUrl()
+const src = computed(() =>
+  url(`sprite/${props.id}?s=${props.size}${isColored(props.id) ? '&c=1' : ''}`),
 )
 
 const image = useTemplateRef('image')

@@ -48,7 +48,8 @@
     "vue-tsc": "^3.3.14"
   },
   "workspaces": [
-    "api"
+    "api",
+    "infra"
   ],
   "overrides": {
     "glob": "^14.0.3"

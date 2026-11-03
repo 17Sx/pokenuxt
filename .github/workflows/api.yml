@@ -1,11 +1,12 @@
 name: API
 
 # The Hono API in api/, on its own: only its dependencies are installed, and
-# every step runs with Bun.
+# every step runs with Bun. The last job checks its AWS infrastructure.
 on:
   pull_request:
     paths:
       - api/**
+      - infra/**
       - scripts/check-i18n.mjs
       - bun.lock
       - .github/workflows/api.yml
@@ -14,6 +15,7 @@ on:
     branches: [dev]
     paths:
       - api/**
+      - infra/**
       - scripts/check-i18n.mjs
       - bun.lock
       - .github/workflows/api.yml
@@ -90,3 +92,16 @@ jobs:
           workspace: pokenuxt-api
       # Vitest runs on the Bun runtime: see the test script.
       - run: bun run test
+
+  infra:
+    name: CDK synth
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v5
+      # The API's dependencies too: synth bundles the Lambda from api/.
+      - uses: ./.github/actions/setup
+      - run: bun run typecheck
+      - run: bun run synth -- --quiet

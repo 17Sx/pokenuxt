@@ -3,8 +3,10 @@ import { defineConfig, devices } from '@playwright/test'
 import type { ConfigOptions } from '@nuxt/test-utils/playwright'
 
 const E2E_API = 'http://localhost:8788'
-// Read by nuxt.config.ts when the tests build the front.
-process.env.API_URL = E2E_API
+const E2E_FRONT_PORT = 3011
+// The front the tests start calls this API from the browser, and the tests
+// read it to reset the wishlist (e2e/api.ts).
+process.env.NUXT_PUBLIC_API_BASE = E2E_API
 
 export default defineConfig<ConfigOptions>({
   testDir: './e2e',
@@ -20,6 +22,7 @@ export default defineConfig<ConfigOptions>({
     locale: 'fr-FR',
     nuxt: {
       rootDir: fileURLToPath(new URL('.', import.meta.url)),
+      port: E2E_FRONT_PORT,
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
@@ -29,6 +32,11 @@ export default defineConfig<ConfigOptions>({
     command: 'bun run --cwd api start',
     url: `${E2E_API}/health`,
     reuseExistingServer: false,
-    env: { PORT: '8788', DATABASE_URL: '' },
+    env: {
+      PORT: '8788',
+      DATABASE_URL: '',
+      // @nuxt/test-utils serves the front on 127.0.0.1.
+      CORS_ORIGINS: `http://127.0.0.1:${E2E_FRONT_PORT}`,
+    },
   },
 })

@@ -1,10 +1,8 @@
 import { expect, test } from '@nuxt/test-utils/playwright'
+import { API, emptyWishlist } from './api'
 
 test.beforeEach(async ({ request }) => {
-  const { items } = await (await request.get('/api/wishlist')).json()
-  for (const { id } of items as { id: number }[]) {
-    await request.delete(`/api/wishlist/${id}`)
-  }
+  await emptyWishlist(request)
 })
 
 test('le site est en français par défaut', async ({ page, goto }) => {
@@ -49,7 +47,7 @@ test('montre le message de l’API quand elle refuse un ajout', async ({
   goto,
 }) => {
   await goto('/', { waitUntil: 'hydration' })
-  await page.route('**/api/wishlist', (route) =>
+  await page.route(`${API}/wishlist`, (route) =>
     route.request().method() === 'POST'
       ? route.fulfill({
           status: 503,
@@ -73,7 +71,7 @@ test('demande les messages de l’API dans la langue du site', async ({
   await page.getByRole('button', { name: 'English' }).click()
 
   const request = page.waitForRequest(
-    (r) => r.url().endsWith('/api/wishlist') && r.method() === 'POST',
+    (r) => r.url() === `${API}/wishlist` && r.method() === 'POST',
   )
   await page
     .getByRole('button', { name: 'Add Bulbasaur to the wishlist' })
