@@ -1,10 +1,23 @@
 # PokéNuxt
 
+[![Deploy](https://github.com/17Sx/pokenuxt/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/17Sx/pokenuxt/actions/workflows/deploy.yml)
+[![Front](https://github.com/17Sx/pokenuxt/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/17Sx/pokenuxt/actions/workflows/ci.yml)
+[![API](https://github.com/17Sx/pokenuxt/actions/workflows/api.yml/badge.svg?branch=dev)](https://github.com/17Sx/pokenuxt/actions/workflows/api.yml)
+[![Coverage front](https://img.shields.io/endpoint?url=https%3A%2F%2Fd1jjigkssadg5n.cloudfront.net%2Fcoverage%2Ffront%2Fbadge.json)](https://d1jjigkssadg5n.cloudfront.net/coverage/front/)
+[![Coverage API](https://img.shields.io/endpoint?url=https%3A%2F%2Fd1jjigkssadg5n.cloudfront.net%2Fcoverage%2Fapi%2Fbadge.json)](https://d1jjigkssadg5n.cloudfront.net/coverage/api/)
+
 Nuxt 4 · Tailwind CSS v4 · Hono · données [PokéAPI](https://pokeapi.co)
+
+| Live                               |                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Front, generated (S3 + CloudFront) | https://d1jjigkssadg5n.cloudfront.net                                                                       |
+| Front, server-rendered (Vercel)    | https://pokenuxt-mauve.vercel.app                                                                           |
+| API (API Gateway + Lambda)         | https://p03y7ni65h.execute-api.eu-north-1.amazonaws.com/health                                              |
+| Coverage reports                   | https://d1jjigkssadg5n.cloudfront.net/coverage/front/ · https://d1jjigkssadg5n.cloudfront.net/coverage/api/ |
 
 ## Architecture
 
-- **`app/`**: the Nuxt front. It has no server logic of its own: pages call the Hono API straight from the browser, at `runtimeConfig.public.apiBase` (`NUXT_PUBLIC_API_BASE`, `http://localhost:8787` by default). The API's CORS lists the front's origins.
+- **`app/`**: the Nuxt front, published twice: generated (SSG) on S3 and CloudFront, and server-rendered (SSR) on Vercel. It has no server logic of its own: pages call the Hono API, from Vercel's server or straight from the browser, at `runtimeConfig.public.apiBase` (`NUXT_PUBLIC_API_BASE`, `http://localhost:8787` by default). The API's CORS lists the front's origins.
 - **`api/`**: the Hono API, a Bun workspace. It calls PokéAPI, dithers the sprites and keeps the wishlist and the likes. In production it runs on **AWS Lambda behind API Gateway** (`src/lambda.ts`), locally on Bun (`src/serve.ts`).
 - **`infra/`**: the AWS infrastructure, with AWS CDK in TypeScript.
 - **`db/migrations/`**: the Postgres schema, as numbered `NNN_name.sql` files applied in order: `000_init.sql` creates the wishlist table, `001_likes.sql` the likes. See [Database](#database).
