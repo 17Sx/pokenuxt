@@ -27,14 +27,14 @@ describe('app', () => {
     })
 
     expect(response.status).toBe(413)
-    expect(await response.json()).toEqual({ error: 'body_too_large' })
+    expect(await response.json()).toMatchObject({ error: 'body_too_large' })
   })
 
   it('renvoie un 404 en JSON pour une route inconnue', async () => {
     const response = await app.request('/nope')
 
     expect(response.status).toBe(404)
-    expect(await response.json()).toEqual({ error: 'not_found' })
+    expect(await response.json()).toMatchObject({ error: 'not_found' })
   })
 })
 

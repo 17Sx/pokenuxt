@@ -27,6 +27,8 @@ jobs:
       - uses: ./.github/actions/setup
       - run: bun run lint
       - run: bun run format:check
+      # Every locale file, front and API, against its en.json.
+      - run: bun run i18n:check
 
   typecheck:
     name: Type check

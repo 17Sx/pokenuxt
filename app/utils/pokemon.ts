@@ -24,34 +24,3 @@ export function pokemonLabel(name: string) {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }
-
-export const TYPE_LABELS: Record<string, string> = {
-  normal: 'Normal',
-  fire: 'Feu',
-  water: 'Eau',
-  electric: 'Électrik',
-  grass: 'Plante',
-  ice: 'Glace',
-  fighting: 'Combat',
-  poison: 'Poison',
-  ground: 'Sol',
-  flying: 'Vol',
-  psychic: 'Psy',
-  bug: 'Insecte',
-  rock: 'Roche',
-  ghost: 'Spectre',
-  dragon: 'Dragon',
-  dark: 'Ténèbres',
-  steel: 'Acier',
-  fairy: 'Fée',
-  stellar: 'Stellaire',
-}
-
-export const STAT_LABELS: Record<string, string> = {
-  hp: 'PV',
-  attack: 'Attaque',
-  defense: 'Défense',
-  'special-attack': 'Atq. Spé.',
-  'special-defense': 'Déf. Spé.',
-  speed: 'Vitesse',
-}

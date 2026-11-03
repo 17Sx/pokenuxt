@@ -4,7 +4,8 @@ import type { NamedAPIResourceList } from 'pokenode-ts'
 const PAGE_SIZE = 48
 
 const { data } = await usePokeApi<NamedAPIResourceList>('pokemon?limit=1351')
-const { wishlist, removePokemon } = useWishlist()
+const { wishlist, removePokemon, error } = useWishlist()
+const { t } = useI18n()
 const { search } = useSearch()
 
 const shown = ref(PAGE_SIZE)
@@ -58,11 +59,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <h1
         class="mt-4 max-w-xl text-[40px] leading-[1.02] font-bold tracking-tight text-zinc-50 sm:text-[56px]"
       >
-        Tous les Pokémon.
+        {{ t('home.title') }}
       </h1>
       <p class="mt-5 max-w-md text-[15px] leading-relaxed text-zinc-400">
-        {{ data?.results.length ?? 0 }} Pokémon tirés de PokéAPI. Cherche-les,
-        ouvre leur fiche, garde tes préférés dans la wishlist.
+        {{ t('home.intro', { count: data?.results.length ?? 0 }) }}
       </p>
 
       <label
@@ -79,12 +79,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <circle cx="7" cy="7" r="4.5" />
           <path d="m10.5 10.5 3 3" stroke-linecap="square" />
         </svg>
-        <span class="sr-only">Rechercher un Pokémon</span>
+        <span class="sr-only">{{ t('home.search') }}</span>
         <input
           ref="input"
           v-model="search"
           type="search"
-          placeholder="Rechercher un Pokémon"
+          :placeholder="t('home.search')"
           autocomplete="off"
           spellcheck="false"
           class="h-full min-w-0 flex-1 bg-transparent text-[15px] text-zinc-50 outline-none placeholder:text-zinc-600 [&::-webkit-search-cancel-button]:hidden"
@@ -98,7 +98,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </label>
     </section>
 
-    <DotSection id="wishlist" title="Wishlist" class="scroll-mt-16">
+    <DotSection id="wishlist" :title="t('wishlist.title')" class="scroll-mt-16">
       <template #meta>
         <span
           class="font-doto text-[22px] leading-none font-bold tracking-[0.12em] text-zinc-50"
@@ -121,7 +121,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </NuxtLink>
           <button
             type="button"
-            :aria-label="`Retirer ${pokemonLabel(p.name)} de la wishlist`"
+            :aria-label="t('wishlist.remove', { name: pokemonLabel(p.name) })"
             class="flex size-6 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-white/10 hover:text-white"
             @click="removePokemon(p)"
           >
@@ -139,17 +139,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </button>
         </li>
       </ul>
-      <p v-else class="text-[14px] text-zinc-500">
-        Aucun Pokémon pour l’instant. Ajoute-en avec le
-        <span class="font-mono text-zinc-300">+</span> d’une carte.
+      <i18n-t
+        v-else
+        keypath="wishlist.empty"
+        tag="p"
+        scope="global"
+        class="text-[14px] text-zinc-500"
+      >
+        <template #plus>
+          <span class="font-mono text-zinc-300">+</span>
+        </template>
+      </i18n-t>
+      <p v-if="error" role="alert" class="mt-4 text-[13px] text-zinc-300">
+        {{ error }}
       </p>
     </DotSection>
 
-    <DotSection id="pokedex" title="Pokédex" class="scroll-mt-16">
+    <DotSection id="pokedex" :title="t('home.pokedex')" class="scroll-mt-16">
       <template #meta>
         <span
           class="font-doto text-[22px] leading-none font-bold tracking-[0.12em] text-zinc-50"
-          :aria-label="`${results.length} résultats`"
+          :aria-label="t('home.results', { count: results.length })"
         >
           {{ dexNumber(results.length) }}
         </span>
@@ -164,7 +174,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </li>
       </ul>
       <p v-else class="text-[14px] text-zinc-500">
-        Aucun Pokémon ne correspond à « {{ search.trim() }} ».
+        {{ t('home.noResults', { query: search.trim() }) }}
       </p>
 
       <div v-if="results.length > shown" class="mt-10 flex justify-center">
@@ -173,7 +183,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           class="inline-flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950 px-4 py-2 text-[13px] text-zinc-300 transition-colors hover:border-white/25 hover:text-white"
           @click="shown += PAGE_SIZE"
         >
-          Afficher plus
+          {{ t('home.showMore') }}
           <span class="font-mono text-[11px] tracking-[0.12em] text-zinc-500">
             {{ shown }} / {{ results.length }}
           </span>

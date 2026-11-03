@@ -7,6 +7,7 @@ const props = withDefaults(
 )
 
 const { addPokemon, removePokemon, isInWishlist } = useWishlist()
+const { t } = useI18n()
 
 const saved = computed(() => isInWishlist(props.pokemon))
 const label = computed(() => pokemonLabel(props.pokemon.name))
@@ -23,8 +24,8 @@ function toggle() {
     :aria-pressed="saved"
     :aria-label="
       saved
-        ? `Retirer ${label} de la wishlist`
-        : `Ajouter ${label} à la wishlist`
+        ? t('wishlist.remove', { name: label })
+        : t('wishlist.add', { name: label })
     "
     class="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border transition-colors duration-300"
     :class="[
@@ -48,7 +49,7 @@ function toggle() {
       <path v-else d="M8 3v10M3 8h10" />
     </svg>
     <span v-if="full">{{
-      saved ? 'Dans la wishlist' : 'Ajouter à la wishlist'
+      saved ? t('wishlist.saved') : t('wishlist.addShort')
     }}</span>
   </button>
 </template>

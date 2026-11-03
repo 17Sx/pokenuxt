@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@nuxt/test-utils/playwright'
+import { API } from './api'
 
 const cardSprite = (page: Page, name: string) =>
   page
@@ -36,7 +37,7 @@ test('le choix est retenu et rendu par le serveur', async ({ page, goto }) => {
 
   // The HTML from the server already asks for the coloured sprite.
   const html = await (await page.request.get('/pokemon/bulbasaur')).text()
-  expect(html).toContain('/api/sprite/1?s=256&amp;c=1')
+  expect(html).toContain(`${API}/sprite/1?s=256&amp;c=1`)
 
   await goto('/pokemon/bulbasaur', { waitUntil: 'hydration' })
   await expect(page.getByRole('button', { name: 'Couleur' })).toHaveAttribute(
@@ -85,7 +86,7 @@ test('ne plante pas avec un cookie de couleur corrompu', async ({
 
   await expect(cardSprite(page, 'Bulbasaur')).toHaveAttribute(
     'src',
-    '/api/sprite/1?s=128',
+    `${API}/sprite/1?s=128`,
   )
   await page
     .getByRole('button', { name: 'Afficher Bulbasaur en couleur' })
@@ -94,10 +95,10 @@ test('ne plante pas avec un cookie de couleur corrompu', async ({
 })
 
 test('sert les sprites en couleur', async ({ request }) => {
-  const sprite = await request.get('/api/sprite/25?s=128&c=1')
+  const sprite = await request.get(`${API}/sprite/25?s=128&c=1`)
   expect(sprite.status()).toBe(200)
   expect(sprite.headers()['content-type']).toBe('image/png')
 
-  const invalid = await request.get('/api/sprite/25?s=128&c=2')
+  const invalid = await request.get(`${API}/sprite/25?s=128&c=2`)
   expect(invalid.status()).toBe(400)
 })

@@ -1,0 +1,16 @@
+{
+  "errors": {
+    "invalid_request": "The request is invalid.",
+    "body_too_large": "The request is too large.",
+    "not_found": "Nothing was found here.",
+    "already_in_wishlist": "This Pokémon is already in the wishlist.",
+    "not_in_wishlist": "This Pokémon isn’t in the wishlist.",
+    "invalid_path": "This PokéAPI path isn’t allowed.",
+    "invalid_query": "limit and offset must be numbers.",
+    "pokeapi_unreachable": "PokéAPI can’t be reached right now.",
+    "pokeapi_error": "PokéAPI answered with an error.",
+    "invalid_sprite": "The sprite id, size or colour is invalid.",
+    "request_failed": "The request failed.",
+    "internal_error": "Something went wrong on our side."
+  }
+}

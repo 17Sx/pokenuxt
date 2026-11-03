@@ -3,6 +3,8 @@ import type { NamedAPIResourceList, Pokemon, PokemonSpecies } from 'pokenode-ts'
 
 const STAT_MAX = 255
 
+const { locale, t, te } = useI18n()
+
 const route = useRoute()
 const slug = String(route.params.name)
 if (!/^[a-z0-9-]{1,100}$/i.test(slug)) {
@@ -30,36 +32,41 @@ const { data: species } = await usePokeApi<PokemonSpecies>(
   `pokemon-species/${pokemon.value.species.name}`,
 )
 
-const french = <T extends { language: { name: string } }>(entries?: T[]) =>
-  entries?.filter((entry) => entry.language.name === 'fr')
+// PokéAPI gives names, categories and descriptions in many languages.
+const inLocale = <T extends { language: { name: string } }>(entries?: T[]) =>
+  entries?.filter((entry) => entry.language.name === locale.value)
 
 const name = computed(
   () =>
-    french(species.value?.names)?.[0]?.name ??
+    inLocale(species.value?.names)?.[0]?.name ??
     pokemonLabel(pokemon.value!.name),
 )
-const genus = computed(() => french(species.value?.genera)?.[0]?.genus)
+const genus = computed(() => inLocale(species.value?.genera)?.[0]?.genus)
 const flavor = computed(() =>
-  french(species.value?.flavor_text_entries)
+  inLocale(species.value?.flavor_text_entries)
     ?.at(-1)
     ?.flavor_text.replace(/\s+/g, ' '),
 )
+
+// A type or stat PokéAPI adds before the locale files know it keeps its name.
+const label = (group: 'types' | 'stats', key: string) =>
+  te(`${group}.${key}`) ? t(`${group}.${key}`) : key
 
 const resource = computed(() => pokemonResource(pokemon.value!.name, id))
 
 const facts = computed(() => [
   {
-    label: 'Taille',
-    value: (pokemon.value!.height / 10).toLocaleString('fr-FR'),
+    label: t('pokemon.height'),
+    value: (pokemon.value!.height / 10).toLocaleString(locale.value),
     unit: 'm',
   },
   {
-    label: 'Poids',
-    value: (pokemon.value!.weight / 10).toLocaleString('fr-FR'),
+    label: t('pokemon.weight'),
+    value: (pokemon.value!.weight / 10).toLocaleString(locale.value),
     unit: 'kg',
   },
   {
-    label: 'Exp. de base',
+    label: t('pokemon.baseExperience'),
     value: String(pokemon.value!.base_experience ?? '—'),
     unit: '',
   },
@@ -68,7 +75,7 @@ const facts = computed(() => [
 const stats = computed(() =>
   pokemon.value!.stats.map((stat) => ({
     name: stat.stat.name,
-    label: STAT_LABELS[stat.stat.name] ?? stat.stat.name,
+    label: label('stats', stat.stat.name),
     value: stat.base_stat,
     share: Math.min(1, stat.base_stat / STAT_MAX),
   })),
@@ -97,7 +104,7 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
       to="/#pokedex"
       class="inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.18em] text-zinc-500 uppercase transition-colors hover:text-white"
     >
-      <span aria-hidden="true">←</span> Pokédex
+      <span aria-hidden="true">←</span> {{ t('pokemon.back') }}
     </NuxtLink>
 
     <div class="mt-8 grid gap-10 md:grid-cols-[1.05fr_1fr] md:gap-12">
@@ -123,7 +130,7 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
           />
         </div>
         <nav
-          aria-label="Pokémon voisins"
+          :aria-label="t('pokemon.neighbours')"
           class="mt-3 flex justify-between font-mono text-[11px] tracking-[0.18em] text-zinc-500"
         >
           <NuxtLink
@@ -169,7 +176,7 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
             :key="type.type.name"
             class="rounded-full border border-white/15 px-2.5 py-0.5 text-[12px] text-zinc-300"
           >
-            {{ TYPE_LABELS[type.type.name] ?? type.type.name }}
+            {{ label('types', type.type.name) }}
           </li>
         </ul>
 
@@ -210,10 +217,12 @@ useHead({ title: () => `${name.value} — PokéNuxt` })
       </div>
     </div>
 
-    <DotSection title="Statistiques" class="mt-14">
+    <DotSection :title="t('pokemon.stats')" class="mt-14">
       <template #meta>
-        <span class="font-mono text-[11px] tracking-[0.18em] text-zinc-500">
-          TOTAL
+        <span
+          class="font-mono text-[11px] tracking-[0.18em] text-zinc-500 uppercase"
+        >
+          {{ t('pokemon.total') }}
           <span
             class="ml-2 font-doto text-[22px] leading-none font-bold tracking-[0.1em] text-zinc-50"
           >

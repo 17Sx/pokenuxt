@@ -1,5 +1,6 @@
 import type { Handler } from 'hono'
 import { createCache } from '../lib/cache'
+import { fail } from '../i18n'
 
 const POKEAPI = 'https://pokeapi.co/api/v2'
 const DAY = 60 * 60 * 24
@@ -15,7 +16,7 @@ export function pokeapiHandler(fetcher: typeof fetch): Handler {
   return async (c) => {
     const path = c.req.path.slice('/pokeapi/'.length)
     if (!/^[\w\-/]+$/.test(path) || path.includes('..')) {
-      return c.json({ error: 'invalid_path' }, 400)
+      return fail(c, 'invalid_path', 400)
     }
 
     // Only the paging parameters go through, so the cache can't be filled
@@ -25,7 +26,7 @@ export function pokeapiHandler(fetcher: typeof fetch): Handler {
       const value = c.req.query(key)
       if (value !== undefined) {
         if (!/^\d{1,5}$/.test(value)) {
-          return c.json({ error: 'invalid_query' }, 400)
+          return fail(c, 'invalid_query', 400)
         }
         query.set(key, value)
       }
@@ -39,12 +40,12 @@ export function pokeapiHandler(fetcher: typeof fetch): Handler {
       try {
         response = await fetcher(`${POKEAPI}/${path}${search}`)
       } catch {
-        return c.json({ error: 'pokeapi_unreachable' }, 502)
+        return fail(c, 'pokeapi_unreachable', 502)
       }
       if (!response.ok) {
         return response.status === 404
-          ? c.json({ error: 'not_found' }, 404)
-          : c.json({ error: 'pokeapi_error' }, 502)
+          ? fail(c, 'not_found', 404)
+          : fail(c, 'pokeapi_error', 502)
       }
       body = await response.text()
       cache.set(key, body)

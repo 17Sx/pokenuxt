@@ -1,6 +1,7 @@
 import type { Handler } from 'hono'
 import { createCache } from '../lib/cache'
 import { ditherSprite } from '../lib/dither'
+import { fail } from '../i18n'
 
 const SPRITES =
   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon'
@@ -39,14 +40,14 @@ export function spriteHandler(fetcher: typeof fetch): Handler {
       !SIZES.includes(size) ||
       (color !== '0' && color !== '1')
     ) {
-      return c.json({ error: 'invalid_sprite' }, 400)
+      return fail(c, 'invalid_sprite', 400)
     }
 
     const key = `${id}-${size}-${color}`
     let png = cache.get(key)
     if (!png) {
       const source = await fetchSprite(fetcher, id)
-      if (!source) return c.json({ error: 'not_found' }, 404)
+      if (!source) return fail(c, 'not_found', 404)
       png = ditherSprite(source, size, color === '1')
       cache.set(key, png)
     }

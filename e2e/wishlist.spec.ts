@@ -1,12 +1,10 @@
 import { expect, test } from '@nuxt/test-utils/playwright'
+import { API, emptyWishlist } from './api'
 
 // The wishlist is one array in the API, shared by every visitor: each test
 // starts by emptying it, through the API like the front does.
 test.beforeEach(async ({ request, goto }) => {
-  const { items } = await (await request.get('/api/wishlist')).json()
-  for (const { id } of items as { id: number }[]) {
-    await request.delete(`/api/wishlist/${id}`)
-  }
+  await emptyWishlist(request)
   await goto('/', { waitUntil: 'hydration' })
 })
 
@@ -92,7 +90,7 @@ test('garde la wishlist après un rechargement', async ({ page, goto }) => {
 test('remet la liste comme avant quand l’API refuse l’ajout', async ({
   page,
 }) => {
-  await page.route('**/api/wishlist', (route) =>
+  await page.route(`${API}/wishlist`, (route) =>
     route.request().method() === 'POST'
       ? route.fulfill({ status: 500, json: { error: 'internal_error' } })
       : route.fallback(),
@@ -112,6 +110,9 @@ test('remet la liste comme avant quand l’API refuse l’ajout', async ({
       .locator('#pokedex')
       .getByRole('button', { name: 'Ajouter Bulbasaur à la wishlist' }),
   ).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('alert')).toHaveText(
+    'La wishlist n’a pas pu être mise à jour. Réessaie dans un instant.',
+  )
 })
 
 test('la wishlist est la même pour tous les visiteurs', async ({
@@ -173,10 +174,10 @@ test('affiche une 404 pour un Pokémon inconnu', async ({ page, goto }) => {
 })
 
 test('sert les sprites en PNG dithéré', async ({ request }) => {
-  const sprite = await request.get('/api/sprite/25?s=128')
+  const sprite = await request.get(`${API}/sprite/25?s=128`)
   expect(sprite.status()).toBe(200)
   expect(sprite.headers()['content-type']).toBe('image/png')
 
-  const invalid = await request.get('/api/sprite/25?s=500')
+  const invalid = await request.get(`${API}/sprite/25?s=500`)
   expect(invalid.status()).toBe(400)
 })
