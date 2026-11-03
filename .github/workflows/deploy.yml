@@ -3,8 +3,12 @@ name: Deploy
 # Every push to main goes to production, once the front, API and database
 # workflows pass: db/ is applied to the database, CDK deploys the API (Lambda
 # behind API Gateway) and the front's S3 bucket and CloudFront distribution,
-# then the front is generated, synced to S3, and CloudFront's cache is
-# invalidated.
+# then the front is published twice: generated (SSG) to S3 and CloudFront,
+# and server-rendered (SSR) to Vercel. Smoke tests check the live release,
+# and the run fails when a critical URL doesn't answer as it should.
+#
+# Each run keeps what it published as artifacts. A run that passes is a
+# stable release that rollback.yml can publish again.
 on:
   push:
     branches: [main]
@@ -17,6 +21,11 @@ concurrency:
   group: deploy-production
   # Never stop a deploy halfway; the next one waits.
   cancel-in-progress: false
+
+env:
+  VERCEL_CLI: vercel@65.9.0
+  # Kept as long as GitHub allows, for rollbacks.
+  RELEASE_RETENTION_DAYS: 90
 
 jobs:
   front-ci:
@@ -48,9 +57,7 @@ jobs:
     name: Deploy the API and the front's infrastructure
     needs: migrate
     runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.site }}
+    environment: production
     outputs:
       api: ${{ steps.deploy.outputs.api }}
       site: ${{ steps.deploy.outputs.site }}
@@ -70,7 +77,7 @@ jobs:
           aws-region: eu-north-1
 
       # PokenuxtWeb (S3, CloudFront) then PokenuxtApi, whose CORS allows the
-      # CloudFront origin, plus WEB_URL when it is set.
+      # CloudFront origin, plus WEB_URL (Vercel) when it is set.
       - id: deploy
         working-directory: infra
         run: |
@@ -82,22 +89,22 @@ jobs:
             echo "distribution=$(jq -r '.PokenuxtWeb.DistributionId' cdk.out/outputs.json)"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Check the API answers, wishlist included
-        run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.api }}/health"
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${{ steps.deploy.outputs.api }}/wishlist"
+      # The synthesized assembly, Lambda bundle included: a rollback deploys
+      # it again as it is, without building anything.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-infra
+          path: infra/cdk.out
+          include-hidden-files: true
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
 
-  web:
-    name: Generate and publish the front
+  ssg:
+    name: Generate and publish the front to S3
     needs: api
     runs-on: ubuntu-latest
     environment:
       name: production
       url: ${{ needs.api.outputs.site }}
-    env:
-      BUCKET: ${{ needs.api.outputs.bucket }}
-      DISTRIBUTION: ${{ needs.api.outputs.distribution }}
-      SITE: ${{ needs.api.outputs.site }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
@@ -110,27 +117,105 @@ jobs:
           NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.api }}
           PRERENDER_POKEMON: '1'
 
+      # The commit this release was built from, which the smoke tests and
+      # rollbacks read.
+      - run: printf '{"commit":"%s","run":%s}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > .output/public/version.json
+
+      # The Vitest reports from front-ci and api-ci, with their badges, at
+      # /coverage/front/ and /coverage/api/.
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-front
+          path: .output/public/coverage/front
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-api
+          path: .output/public/coverage/api
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ssg
+          path: .output/public
+          include-hidden-files: true
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      # Built assets have a hash in their name: cache them for a year. Pages
-      # and payloads change with each deploy: CloudFront keeps them a day,
-      # until the invalidation below, and browsers check every time.
-      - name: Sync to S3
-        run: |
-          aws s3 sync .output/public "s3://$BUCKET" --delete --exclude "*" --include "_nuxt/*" --cache-control "public, max-age=31536000, immutable"
-          aws s3 sync .output/public "s3://$BUCKET" --delete --exclude "_nuxt/*" --cache-control "public, max-age=0, s-maxage=86400, must-revalidate"
+      - uses: ./.github/actions/publish-site
+        with:
+          path: .output/public
+          bucket: ${{ needs.api.outputs.bucket }}
+          distribution: ${{ needs.api.outputs.distribution }}
 
-      - name: Invalidate CloudFront
-        run: |
-          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths "/*" --query Invalidation.Id --output text)
-          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION" --id "$id"
+  ssr:
+    name: Build and publish the front to Vercel
+    needs: api
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+      # The API Gateway URL the pages call, from the server and the browser.
+      NUXT_PUBLIC_API_BASE: ${{ needs.api.outputs.api }}
+      # On a GitHub runner Nitro would detect GitHub Actions and build a plain
+      # Node server, which Vercel can't deploy.
+      NITRO_PRESET: vercel
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
 
-      - name: Check the site answers and the API lets it in
-        run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "$SITE/"
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --output /dev/null "$SITE/pokemon/pikachu"
-          curl --fail --silent --show-error --head --header "Origin: $SITE" "${{ needs.api.outputs.api }}/health" | grep -i "access-control-allow-origin: $SITE"
+      # Vercel's own Git deploys are off (vercel.json): this job is the only
+      # way a release reaches it.
+      - run: bunx $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: bunx $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - run: printf '{"commit":"%s","run":%s}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > .vercel/output/static/version.json
+
+      # The prebuilt output: a rollback deploys it again as it is.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ssr
+          path: .vercel/output
+          include-hidden-files: true
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
+
+      - run: bunx $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  smoke:
+    name: Check the live release
+    needs: [api, ssg, ssr]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # /health, SSR and SSG pages read as raw HTML, HTTP codes, CORS and the
+      # published commit. Any failure fails the deploy.
+      - run: bun scripts/smoke.ts
+        env:
+          SMOKE_API: ${{ needs.api.outputs.api }}
+          SMOKE_SSG: ${{ needs.api.outputs.site }}
+          SMOKE_SSR: ${{ vars.WEB_URL }}
+          SMOKE_VERSION: ${{ github.sha }}
+
+      # Only a release that passed gets this: rollback.yml looks for it.
+      - run: |
+          jq -n \
+            --arg commit "$GITHUB_SHA" --argjson run "$GITHUB_RUN_ID" \
+            --arg api "${{ needs.api.outputs.api }}" --arg ssg "${{ needs.api.outputs.site }}" --arg ssr "${{ vars.WEB_URL }}" \
+            --arg bucket "${{ needs.api.outputs.bucket }}" --arg distribution "${{ needs.api.outputs.distribution }}" \
+            '{commit: $commit, run: $run, api: $api, ssg: $ssg, ssr: $ssr, bucket: $bucket, distribution: $distribution}' > release.json
+          cat release.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.json
+          retention-days: ${{ env.RELEASE_RETENTION_DAYS }}
