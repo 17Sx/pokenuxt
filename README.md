@@ -13,7 +13,6 @@ Nuxt 4 · Tailwind CSS v4 · Hono · données [PokéAPI](https://pokeapi.co)
 | Front, generated (S3 + CloudFront) | https://d1jjigkssadg5n.cloudfront.net                                                                       |
 | Front, server-rendered (Vercel)    | https://pokenuxt-mauve.vercel.app                                                                           |
 | API (API Gateway + Lambda)         | https://p03y7ni65h.execute-api.eu-north-1.amazonaws.com/health                                              |
-| Coverage reports                   | https://d1jjigkssadg5n.cloudfront.net/coverage/front/ · https://d1jjigkssadg5n.cloudfront.net/coverage/api/ |
 
 ## Setup
 
